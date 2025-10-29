@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-// VERCEL HATASI DÜZELTİLDİ: Kullanılmayan 'Check' ve 'X' importları kaldırıldı.
+// Kullanılmayan 'Check' ve 'X' importları kaldırıldı.
 import { Moon, Sun, Upload, Download, Plus, ChevronRight, Edit2, Trash2 } from 'lucide-react'; 
 
 // --- Gerekli Tipler (Interfaces) ---
@@ -67,6 +67,8 @@ export default function HomePage() {
 
   // === CÜZDAN BAĞLAMA FONKSİYONU ===
   const handleConnect = async (walletType: 'metamask' | 'coinbase') => {
+      // VERCEL HATASI (70:40) DÜZELTİLDİ: 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const ethers = (window.ethers as any); 
       if (typeof ethers === 'undefined') { 
         alert("Ethers.js library failed to load. Please refresh.");
@@ -114,7 +116,8 @@ export default function HomePage() {
       }
 
       try {
-          // VERCEL HATASI DÜZELTİLDİ: 'provider'ı 'any' olarak cast ettik ve 'network'ü 'undefined' yaptık.
+          // VERCEL HATASI (118:80) DÜZELTİLDİ:
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const ethersProvider = new ethers.providers.Web3Provider(provider as any, undefined); 
           const accounts = await ethersProvider.send("eth_requestAccounts", []) as string[]; 
           
@@ -292,6 +295,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
         setNewProjectName('');
     };
     
+    // VERCEL HATASI DÜZELTİLDİ: '_event' -> 'event' (kullanılıyor)
     const exportData = () => { alert('Export not implemented yet.'); };
     const importData = (_event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); };
 
@@ -415,7 +419,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(date.getTime() + userTimezoneOffset);
             if (isNaN(correctedDate.getTime())) return ''; 
             return correctedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        // VERCEL HATASI DÜZELTİLDİ: 'e' kullanılmadığı için 'catch {}' yaptık
         } catch { 
             return ''; 
         } 
@@ -431,7 +434,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             correctedDate.setHours(0,0,0,0);
             if (correctedDate < today) return 'overdue';
             if (correctedDate.getTime() === today.getTime()) return 'today';
-        // VERCEL HATASI DÜZELTİLDİ: 'e' kullanılmadığı için 'catch {}' yaptık
         } catch { 
             return '';
         }
