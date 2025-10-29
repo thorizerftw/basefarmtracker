@@ -1,6 +1,7 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { Moon, Sun, Upload, Download, Plus, ChevronRight, Edit2, Trash2, Check, X } from 'lucide-react'; 
+// VERCEL HATASI DÜZELTİLDİ: Kullanılmayan 'Check' ve 'X' importları kaldırıldı.
+import { Moon, Sun, Upload, Download, Plus, ChevronRight, Edit2, Trash2 } from 'lucide-react'; 
 
 // --- Gerekli Tipler (Interfaces) ---
 interface Task {
@@ -14,16 +15,24 @@ interface ProjectDetails { notes: string; website: string; twitter: string; }
 interface Project { id: number; name: string; tasks: Task[]; details: ProjectDetails; }
 interface UserIdentity {
   address: string;
-  pfpUrl: string; // Bunu artık kullanmayacağız ama tipte kalsın
+  pfpUrl: string;
   displayName: string;
 }
 
-// --- Tarayıcı Tipleri (Ethers.js için) ---
+// --- VERCEL HATASI DÜZELTİLDİ: 'any' yerine daha spesifik tipler ---
+// 'window.ethereum' için kısmi tip tanımı
+interface EthereumProvider {
+  isMetaMask?: boolean;
+  isCoinbaseWallet?: boolean;
+  providers?: EthereumProvider[];
+  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
+}
+
 declare global {
     interface Window {
-        ethers?: any; 
-        ethereum?: any; 
-        coinbaseWalletExtension?: any; 
+        ethers?: unknown; // 'any' yerine 'unknown'
+        ethereum?: EthereumProvider; 
+        coinbaseWalletExtension?: EthereumProvider; 
     }
 }
 
@@ -34,16 +43,18 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false); 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // === MANUEL MİNİ-APP KODU (Coinbase Wallet için) ===
+  // === MANUEL MİNİ-APP KODU ===
   useEffect(() => {
     setIsClient(true); 
     if (window.parent !== window) {
+      // VERCEL HATASI DÜZELTİLDİ: 'event.data' için 'any' yerine tip ataması
       const handleMessage = (event: MessageEvent) => {
-        if (event.data.type === 'mini-app-identity') {
-          setIdentity(event.data.identity);
+        const data = event.data as { type: string; identity?: UserIdentity; theme?: string };
+        if (data.type === 'mini-app-identity' && data.identity) {
+          setIdentity(data.identity);
         }
-        if (event.data.type === 'mini-app-theme') {
-          setIsDarkMode(event.data.theme === 'dark');
+        if (data.type === 'mini-app-theme' && data.theme) {
+          setIsDarkMode(data.theme === 'dark');
         }
       };
       window.addEventListener('message', handleMessage);
@@ -58,17 +69,27 @@ export default function HomePage() {
 
   // === CÜZDAN BAĞLAMA FONKSİYONU ===
   const handleConnect = async (walletType: 'metamask' | 'coinbase') => {
-      if (typeof window.ethers === 'undefined') { 
+      // VERCEL HATASI DÜZELTİLDİ: 'window.ethers'ı 'any' olarak cast ediyoruz
+      const ethers = (window.ethers as any); 
+      if (typeof ethers === 'undefined') { 
         alert("Ethers.js library failed to load. Please refresh.");
         return;
       }
-      const ethereum = window.ethereum as any; 
       
-      let provider: any = null;
+      const ethereum = window.ethereum; 
+      const coinbaseWalletExtension = window.coinbaseWalletExtension;
+
+      if (!ethereum && !coinbaseWalletExtension) {
+          alert("No compatible wallet detected!");
+          return;
+      }
+
+      let provider: EthereumProvider | undefined = undefined; 
 
       if (walletType === 'metamask') {
           if (ethereum?.providers) {
-              provider = ethereum.providers.find((p: any) => p.isMetaMask);
+              // VERCEL HATASI DÜZELTİLDİ: 'p: any' yerine tip tanımı
+              provider = ethereum.providers.find((p) => p.isMetaMask);
           } else if (ethereum?.isMetaMask) {
               provider = ethereum;
           }
@@ -78,9 +99,10 @@ export default function HomePage() {
           }
       } 
       else if (walletType === 'coinbase') {
-          provider = window.coinbaseWalletExtension;
+          provider = coinbaseWalletExtension;
           if (!provider && ethereum?.providers) {
-              provider = ethereum.providers.find((p: any) => p.isCoinbaseWallet);
+              // VERCEL HATASI DÜZELTİLDİ: 'p: any' yerine tip tanımı
+              provider = ethereum.providers.find((p) => p.isCoinbaseWallet);
           }
           if (!provider && ethereum?.isCoinbaseWallet) {
               provider = ethereum;
@@ -91,9 +113,15 @@ export default function HomePage() {
           }
       }
 
+      if (!provider) {
+          alert("No compatible provider found.");
+          return;
+      }
+
       try {
-          const ethersProvider = new window.ethers.providers.Web3Provider(provider, "any"); 
-          const accounts = await ethersProvider.send("eth_requestAccounts", []); 
+          const ethersProvider = new ethers.providers.Web3Provider(provider, "any"); 
+          // VERCEL HATASI DÜZELTİLDİ: 'accounts'a 'any' yerine tip tanımı
+          const accounts = await ethersProvider.send("eth_requestAccounts", []) as string[]; 
           
           if (!accounts || accounts.length === 0) {
              throw new Error("No accounts found/selected.");
@@ -104,17 +132,20 @@ export default function HomePage() {
           
           setIdentity({ 
               address: address, 
-              displayName: 'Browser User', // İsim sahte kalır
-              pfpUrl: '' // PFP'yi boş veriyoruz
+              displayName: 'Browser User',
+              pfpUrl: '' // PFP'yi kaldırdık
           });
           
           setIsModalOpen(false);
-      } catch (err: any) { 
+      } catch (err: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'err: any' yerine 'err: unknown'
           console.error("Connection Error:", err);
-          if (err.code === 4001) { 
+          // Hata tipini kontrol et
+          if (typeof err === 'object' && err !== null && 'code' in err && (err as {code: unknown}).code === 4001) { 
             // Kullanıcı popup'ı kapattı (Reddetti)
-          } else {
+          } else if (err instanceof Error) {
               alert(`Connection failed: ${err.message}`);
+          } else {
+              alert("An unknown connection error occurred.");
           }
       }
   };
@@ -125,15 +156,17 @@ export default function HomePage() {
 
   // === GERÇEK DISCONNECT FONKSİYONU ===
   const disconnectWallet = async () => {
-      const ethereum = window.ethereum as any;
+      const ethereum = window.ethereum;
       if (ethereum && ethereum.request) {
           try {
               await ethereum.request({ 
                   method: 'wallet_revokePermissions', 
                   params: [{ eth_accounts: {} }] 
               });
-          } catch (err: any) { 
-              console.warn("Could not revoke permissions:", err.message); 
+          } catch (err: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'err: any' yerine 'err: unknown'
+              if (err instanceof Error) {
+                console.warn("Could not revoke permissions:", err.message); 
+              }
           }
       }
       setIdentity(null);
@@ -169,6 +202,7 @@ export default function HomePage() {
           <h1>BaseFarm Tracker</h1>
           <div className="header-actions">
             
+            {/* PFP (sağ üstteki "52" yazısı) kaldırıldı */}
             {identity && (
               <>
                 <button 
@@ -239,8 +273,14 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
         try {
             const saved = localStorage.getItem(getStorageKey('farm-tracker'));
             const parsedProjects = saved ? JSON.parse(saved) : [];
-            return parsedProjects.map((p: any) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
-        } catch (error) { return []; }
+            // VERCEL HATASI DÜZELTİLDİ: 'p: any' yerine tip tanımı
+            return parsedProjects.map((p: Project) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
+        } catch (err: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'error' -> 'err', 'any' -> 'unknown'
+            if (err instanceof Error) {
+              console.warn("Failed to parse projects from localStorage", err.message);
+            }
+            return []; 
+        }
     });
 
     const [newProjectName, setNewProjectName] = useState('');
@@ -261,7 +301,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     };
     
     const exportData = () => { alert('Export not implemented yet.'); };
-    const importData = (event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); };
+    // VERCEL HATASI DÜZELTİLDİ: 'event' kullanılmadığı için '_event' yapıldı
+    const importData = (_event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); };
 
     const sortedProjects = useMemo(() => {
         const projectsCopy = [...projects];
@@ -342,8 +383,11 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     }, [project.id, setProjects]);
 
     const deleteProject = () => { if (window.confirm('Are you sure you want to delete this project?')) { setProjects(prevProjects => prevProjects.filter(p => p.id !== project.id)); } };
-    const handleTaskInputChange = (field: keyof typeof newTaskInputs, value: string) => setNewTaskInputs(prev => ({...prev, [field]: value }));
+    const deleteTask = (taskId: number) => { if (window.confirm('Are you sure?')) { updateProject({ tasks: project.tasks.filter(t => t.id !== taskId) }); } };
     
+    const handleTaskInputChange = (field: keyof typeof newTaskInputs, value: string) => setNewTaskInputs(prev => ({...prev, [field]: value }));
+    const handleDetailChange = (field: keyof ProjectDetails, value: string) => updateProject({ details: { ...(project.details || { notes: '', website: '', twitter: '' }), [field]: value } });
+
     const addTask = (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         const text = newTaskInputs.text.trim(); 
@@ -353,8 +397,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
         setNewTaskInputs({ text: '', dueDate: '', priority: 'medium' }); 
     };
     
-    const deleteTask = (taskId: number) => { if (window.confirm('Are you sure?')) { updateProject({ tasks: project.tasks.filter(t => t.id !== taskId) }); } };
-    const handleDetailChange = (field: keyof ProjectDetails, value: string) => updateProject({ details: { ...(project.details || { notes: '', website: '', twitter: '' }), [field]: value } });
     const toggleTask = (taskId: number) => updateProject({ tasks: project.tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t) });
     
     const handleEdit = (task: Task) => { setEditingTaskId(task.id); setEditingText(task.text); };
@@ -382,26 +424,24 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(date.getTime() + userTimezoneOffset);
             if (isNaN(correctedDate.getTime())) return ''; 
             return correctedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        } catch (e) { return ''; } 
+        } catch (_e: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'e' -> '_e'
+            return ''; 
+        } 
     };
-
-    // === DÜZELTİLMİŞ FONKSİYON ===
-    // 'correctedDueDate' (YANLIŞ) -> 'correctedDate' (DOĞRU) olarak düzeltildi.
     const getDueDateClass = (task: Task): string => {
         if (!task.dueDate || task.completed) return '';
         try {
             const today = new Date(); today.setHours(0,0,0,0);
             const dueDate = new Date(task.dueDate); 
             const userTimezoneOffset = dueDate.getTimezoneOffset() * 60000;
-            const correctedDate = new Date(dueDate.getTime() + userTimezoneOffset); // Değişken adı 'correctedDate'
+            const correctedDate = new Date(dueDate.getTime() + userTimezoneOffset); 
             if (isNaN(correctedDate.getTime())) return '';
             correctedDate.setHours(0,0,0,0);
-            
-            // DÜZELTME: 'correctedDueDate' -> 'correctedDate'
             if (correctedDate < today) return 'overdue';
-            // DÜZELTME: 'correctedDueDate' -> 'correctedDate'
             if (correctedDate.getTime() === today.getTime()) return 'today';
-        } catch(e) { return ''; }
+        } catch(_e: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'e' -> '_e'
+            return '';
+        }
         return '';
     };
 
@@ -510,7 +550,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
 
 
 // === Cüzdan Bağlama Popup (Modal) Bileşeni ===
-// İKONLAR SİLİNMİŞ HALİ
 interface ConnectModalProps {
     onClose: () => void;
     onConnect: (walletType: 'metamask' | 'coinbase') => void;
