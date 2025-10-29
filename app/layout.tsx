@@ -1,52 +1,40 @@
-import type { Metadata } from "next";
-import { Inter, Source_Code_Pro } from "next/font/google";
-import { SafeArea } from "@coinbase/onchainkit/minikit";
-import { minikitConfig } from "../minikit.config";
-import { RootProvider } from "./rootProvider";
-import "./globals.css";
+import './globals.css'; 
+import { RootProvider } from '@/app/rootProvider'; 
+import type { Metadata } from 'next';
+import { Inter, Source_Code_Pro } from 'next/font/google';
 
-export async function generateMetadata(): Promise<Metadata> {
-  return {
-    title: minikitConfig.miniapp.name,
-    description: minikitConfig.miniapp.description,
-    other: {
-      "fc:frame": JSON.stringify({
-        version: minikitConfig.miniapp.version,
-        imageUrl: minikitConfig.miniapp.heroImageUrl,
-        button: {
-          title: `Join the ${minikitConfig.miniapp.name} Waitlist`,
-          action: {
-            name: `Launch ${minikitConfig.miniapp.name}`,
-            type: "launch_frame",
-          },
-        },
-      }),
-    },
-  };
-}
-
-const inter = Inter({
-  variable: "--font-inter",
-  subsets: ["latin"],
-});
-
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const sourceCodePro = Source_Code_Pro({
-  variable: "--font-source-code-pro",
-  subsets: ["latin"],
+  subsets: ['latin'],
+  variable: '--font-source-code-pro',
 });
+
+export const metadata = {
+  title: 'BaseFarm Tracker',
+  description: 'Airdrop farm tracker mini-app',
+};
 
 export default function RootLayout({
   children,
-}: Readonly<{
+}: {
   children: React.ReactNode;
-}>) {
+}) {
   return (
-    <RootProvider>
-      <html lang="en">
-        <body className={`${inter.variable} ${sourceCodePro.variable}`}>
-          <SafeArea>{children}</SafeArea>
-        </body>
-      </html>
-    </RootProvider>
+    <html lang="en">
+      <body className={`${inter.variable} ${sourceCodePro.variable}`}>
+        <RootProvider>
+          {children}
+        </RootProvider>
+        
+        {/*
+          İŞTE YENİ SATIR BU:
+          Bu, MetaMask/Coinbase'e bağlanmak için gereken 'ethers' kütüphanesini yükler.
+        */}
+        <script 
+          src="https://cdnjs.cloudflare.com/ajax/libs/ethers/5.7.2/ethers.umd.min.js" 
+          defer 
+        ></script>
+      </body>
+    </html>
   );
 }

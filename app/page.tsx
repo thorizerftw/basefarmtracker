@@ -1,182 +1,545 @@
-// 'use client', bu sayfanın tarayıcıda çalışacağını belirtir.
-// Çünkü 'useState', 'useEffect' ve 'localStorage' gibi
-// sadece tarayıcıda olan özellikleri kullanacağız.
 'use client';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { Moon, Sun, Upload, Download, Plus, ChevronRight, Edit2, Trash2, Check, X } from 'lucide-react'; 
 
-// React kancalarını (hook) import ediyoruz (içe aktarıyoruz)
-import { useState, useEffect } from 'react';
-
-// Bir "Görev" (Task) objesinin nasıl görüneceğini tanımlıyoruz.
-// Bu, kodumuzu daha okunaklı yapar.
+// --- Gerekli Tipler (Interfaces) ---
 interface Task {
-  id: string; // Görevin benzersiz kimliği
-  text: string; // Görevin metni (örn: "LayerZero'da hacim yap")
-  isCompleted: boolean; // Tamamlandı mı? (true/false)
+  id: number;
+  text: string;
+  dueDate: string;
+  priority: 'low' | 'medium' | 'high';
+  completed: boolean;
+}
+interface ProjectDetails { notes: string; website: string; twitter: string; }
+interface Project { id: number; name: string; tasks: Task[]; details: ProjectDetails; }
+interface UserIdentity {
+  address: string;
+  pfpUrl: string; // Bunu artık kullanmayacağız ama tipte kalsın
+  displayName: string;
 }
 
-// Ana Sayfa Bileşenimiz (Ekranda görünen her şey)
-export default function Home() {
-  // 1. STATE TANIMLAMALARI (Bileşenin Hafızası)
-
-  // 'tasks' state'i: Tüm görevlerimizi bir dizi (liste) içinde tutar.
-  // Başlangıçta boş bir listedir: [].
-  const [tasks, setTasks] = useState<Task[]>([]);
-
-  // 'taskText' state'i: Kullanıcının input'a yazdığı metni tutar.
-  // Başlangıçta boş bir metindir: "".
-  const [taskText, setTaskText] = useState<string>('');
-
-  // 2. useEffect KANCALARI (Yan Etkiler)
-
-  // Bu 'useEffect', sayfa İLK YÜKLENDİĞİNDE sadece 1 kez çalışır.
-  // Görevi: Tarayıcının hafızasından ('localStorage') eski görevleri yüklemek.
-  useEffect(() => {
-    // Hafızadan 'airdropTasks' anahtarıyla kayıtlı veriyi çekmeyi dene.
-    const storedTasks = localStorage.getItem('airdropTasks');
-    // Eğer veri varsa (boş değilse),
-    if (storedTasks) {
-      // Çektiğin metni (JSON) tekrar listeye (diziye) çevir
-      // ve 'tasks' state'ine ata.
-      setTasks(JSON.parse(storedTasks));
+// --- Tarayıcı Tipleri (Ethers.js için) ---
+declare global {
+    interface Window {
+        ethers?: any; 
+        ethereum?: any; 
+        coinbaseWalletExtension?: any; 
     }
-    // '[]' boş dizi, bu effect'in sadece ilk açılışta çalışmasını sağlar.
-  }, []);
+}
 
-  // Bu 'useEffect', 'tasks' listesi (state'i) DEĞİŞTİĞİ her an çalışır.
-  // Görevi: Görev listesinin son halini tarayıcının hafızasına kaydetmek.
+// --- Ana Sayfa Bileşeni ---
+export default function HomePage() {
+  const [identity, setIdentity] = useState<UserIdentity | null>(null);
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [isClient, setIsClient] = useState(false); 
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  // === MANUEL MİNİ-APP KODU (Coinbase Wallet için) ===
   useEffect(() => {
-    // 'tasks' listesini metne (JSON) çevir
-    // ve 'airdropTasks' anahtarıyla hafızaya kaydet.
-    localStorage.setItem('airdropTasks', JSON.stringify(tasks));
-    // [tasks] bağımlılığı, 'tasks' listesi değiştiğinde bu effect'in tetiklenmesini sağlar.
-  }, [tasks]);
-
-  // 3. FONKSİYONLAR (Butonlara tıklandığında ne olacağı)
-
-  // "Ekle" butonuna tıklandığında çalışır
-  const handleAddTask = () => {
-    // Input'un içindeki metnin başındaki/sonundaki boşlukları sil
-    const trimmedText = taskText.trim();
-
-    // Eğer metin boş değilse (kullanıcı bir şey yazdıysa)
-    if (trimmedText !== '') {
-      // Yeni bir görev objesi oluştur
-      const newTask: Task = {
-        id: Date.now().toString(), // Benzersiz bir ID için şu anki zamanı kullan
-        text: trimmedText,
-        isCompleted: false, // Yeni görev "tamamlanmadı" olarak başlar
+    setIsClient(true); 
+    if (window.parent !== window) {
+      const handleMessage = (event: MessageEvent) => {
+        if (event.data.type === 'mini-app-identity') {
+          setIdentity(event.data.identity);
+        }
+        if (event.data.type === 'mini-app-theme') {
+          setIsDarkMode(event.data.theme === 'dark');
+        }
       };
+      window.addEventListener('message', handleMessage);
+      window.parent.postMessage({ type: 'mini-app-loaded' }, '*');
+      window.parent.postMessage({ type: 'mini-app-request-identity' }, '*');
+      window.parent.postMessage({ type: 'mini-app-request-theme' }, '*');
+      return () => {
+        window.removeEventListener('message', handleMessage);
+      };
+    }
+  }, []); 
 
-      // 'tasks' listesini güncelle:
-      // Mevcut listenin (...tasks) sonuna yeni görevi (newTask) ekle.
-      setTasks([...tasks, newTask]);
+  // === CÜZDAN BAĞLAMA FONKSİYONU ===
+  const handleConnect = async (walletType: 'metamask' | 'coinbase') => {
+      if (typeof window.ethers === 'undefined') { 
+        alert("Ethers.js library failed to load. Please refresh.");
+        return;
+      }
+      const ethereum = window.ethereum as any; 
+      
+      let provider: any = null;
 
-      // Input kutusunu temizle
-      setTaskText('');
+      if (walletType === 'metamask') {
+          if (ethereum?.providers) {
+              provider = ethereum.providers.find((p: any) => p.isMetaMask);
+          } else if (ethereum?.isMetaMask) {
+              provider = ethereum;
+          }
+          if (!provider) {
+              alert("MetaMask not found. Please install the extension.");
+              return;
+          }
+      } 
+      else if (walletType === 'coinbase') {
+          provider = window.coinbaseWalletExtension;
+          if (!provider && ethereum?.providers) {
+              provider = ethereum.providers.find((p: any) => p.isCoinbaseWallet);
+          }
+          if (!provider && ethereum?.isCoinbaseWallet) {
+              provider = ethereum;
+          }
+          if (!provider) {
+              alert("Coinbase Wallet not found. Please install the extension.");
+              return;
+          }
+      }
+
+      try {
+          const ethersProvider = new window.ethers.providers.Web3Provider(provider, "any"); 
+          const accounts = await ethersProvider.send("eth_requestAccounts", []); 
+          
+          if (!accounts || accounts.length === 0) {
+             throw new Error("No accounts found/selected.");
+          }
+          
+          const signer = ethersProvider.getSigner();
+          const address = await signer.getAddress();
+          
+          setIdentity({ 
+              address: address, 
+              displayName: 'Browser User', // İsim sahte kalır
+              pfpUrl: '' // PFP'yi boş veriyoruz
+          });
+          
+          setIsModalOpen(false);
+      } catch (err: any) { 
+          console.error("Connection Error:", err);
+          if (err.code === 4001) { 
+            // Kullanıcı popup'ı kapattı (Reddetti)
+          } else {
+              alert(`Connection failed: ${err.message}`);
+          }
+      }
+  };
+  
+  const handleFarcasterConnect = () => {
+      alert("Farcaster sign-in only works inside the Coinbase Wallet Mini-App.");
+  };
+
+  // === GERÇEK DISCONNECT FONKSİYONU ===
+  const disconnectWallet = async () => {
+      const ethereum = window.ethereum as any;
+      if (ethereum && ethereum.request) {
+          try {
+              await ethereum.request({ 
+                  method: 'wallet_revokePermissions', 
+                  params: [{ eth_accounts: {} }] 
+              });
+          } catch (err: any) { 
+              console.warn("Could not revoke permissions:", err.message); 
+          }
+      }
+      setIdentity(null);
+  }
+
+  // === TEMA KODU ===
+  useEffect(() => {
+    if (isClient) { 
+        if (isDarkMode) {
+            document.body.classList.add('dark');
+        } else {
+            document.body.classList.remove('dark');
+        }
+    }
+  }, [isDarkMode, isClient]);
+
+  const toggleTheme = () => {
+    const newTheme = !isDarkMode;
+    setIsDarkMode(newTheme);
+    if (window.parent !== window) {
+        window.parent.postMessage({ type: 'mini-app-set-theme', theme: newTheme ? 'dark' : 'light' }, '*');
     }
   };
 
-  // "Sil" butonuna tıklandığında çalışır
-  // Hangi görevin silineceğini 'id' parametresi ile bilir
-  const handleDeleteTask = (id: string) => {
-    // 'tasks' listesini filtrele:
-    // Sadece ID'si tıklanan ID'ye eşit OLMAYAN görevleri tut.
-    // (Tıklananı dışarıda bırakmış oluruz)
-    const updatedTasks = tasks.filter((task) => task.id !== id);
+  if (!isClient) {
+    return null;
+  }
 
-    // 'tasks' listesini bu yeni filtrelenmiş liste ile güncelle.
-    setTasks(updatedTasks);
-  };
-
-  // Checkbox'a (onay kutusu) tıklandığında çalışır
-  const handleToggleTask = (id: string) => {
-    // 'tasks' listesindeki her bir elemanı 'map' ile dön
-    const updatedTasks = tasks.map((task) => {
-      // Eğer ID'si tıklanan ID ile eşleşirse
-      if (task.id === id) {
-        // Görevin diğer tüm bilgilerini (...task) koru,
-        // ama 'isCompleted' durumunu tam tersine çevir (!task.isCompleted).
-        return { ...task, isCompleted: !task.isCompleted };
-      }
-      // Eşleşmiyorsa, görevi olduğu gibi (değiştirmeden) bırak.
-      return task;
-    });
-
-    // 'tasks' listesini bu güncellenmiş liste ile değiştir.
-    setTasks(updatedTasks);
-  };
-
-  // 4. JSX (Ekranda görünecek HTML kodları)
-  // Tailwind CSS sınıfları (className) ile stillendirilmiştir.
   return (
-    <main className="flex min-h-screen flex-col items-center p-8 sm:p-24 bg-gray-950 text-gray-100">
-      <div className="w-full max-w-2xl">
-        {/* Başlık */}
-        <h1 className="text-4xl sm:text-5xl font-bold text-center mb-10 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
-          Base Drop Tracker
-        </h1>
-
-        {/* Yeni Görev Ekleme Formu */}
-        <div className="flex flex-col sm:flex-row gap-4 mb-8">
-          <input
-            type="text"
-            value={taskText} // Input'un değeri 'taskText' state'ine bağlı
-            onChange={(e) => setTaskText(e.target.value)} // Her tuşa basıldığında 'taskText' state'ini güncelle
-            placeholder="Yeni bir farm görevi girin (örn: ZkSync'te hacim yap)"
-            className="flex-grow p-4 rounded-lg bg-gray-800 border border-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          />
-          <button
-            onClick={handleAddTask} // Tıklandığında 'handleAddTask' fonksiyonunu çalıştır
-            className="px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg hover:from-blue-600 hover:to-purple-700 font-semibold text-lg transition-all duration-200"
-          >
-            Ekle
-          </button>
-        </div>
-
-        {/* Görev Listesi */}
-        <div className="space-y-4">
-          {/* 'tasks' listesindeki her bir 'task' için bir 'div' oluştur */}
-          {tasks.map((task) => (
-            <div
-              key={task.id} // React'ın listeyi takip edebilmesi için benzersiz 'key'
-              className="flex items-center justify-between p-5 bg-gray-800 rounded-lg border border-gray-700 shadow-lg"
-            >
-              <div className="flex items-center flex-grow">
-                {/* Tamamlandı Checkbox'ı */}
-                <input
-                  type="checkbox"
-                  checked={task.isCompleted}
-                  onChange={() => handleToggleTask(task.id)}
-                  className="w-6 h-6 mr-5 rounded bg-gray-700 border-gray-600 text-blue-500 focus:ring-blue-500 cursor-pointer"
-                />
-                {/* Görev Metni */}
-                <span
-                  className={`text-lg break-all ${
-                    task.isCompleted ? 'line-through text-gray-500' : ''
-                  }`}
+    <>
+      <div className="app-container">
+        <header className="app-header">
+          <h1>BaseFarm Tracker</h1>
+          <div className="header-actions">
+            
+            {identity && (
+              <>
+                <button 
+                  onClick={disconnectWallet} 
+                  className="connectButton disconnect"
+                  style={{padding: '0.6rem 1rem'}}
                 >
-                  {task.text}
-                </span>
-              </div>
-              {/* Sil Butonu */}
-              <button
-                onClick={() => handleDeleteTask(task.id)}
-                className="ml-4 px-4 py-2 bg-red-600 rounded-lg text-sm hover:bg-red-700 transition-colors duration-200"
-              >
-                Sil
-              </button>
-            </div>
-          ))}
-        </div>
+                  Disconnect
+                </button>
+              </>
+            )}
+            
+            <button
+              onClick={toggleTheme}
+              className="icon-button"
+              aria-label="Toggle theme"
+            >
+              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+          </div>
+        </header>
 
-        {/* Görev listesi boşsa gösterilecek mesaj */}
-        {tasks.length === 0 && (
-          <p className="text-center text-gray-500 mt-10">
-            Henüz hiç görev eklemediniz.
-          </p>
-        )}
-      </div>
-    </main>
+        <main>
+          {identity ? (
+            <FarmTracker userAddress={identity.address} />
+          ) : (
+            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--subtle-text-color)' }}>
+              <p style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>
+                Please connect to continue.
+              </p>
+              
+              <button 
+                  onClick={() => setIsModalOpen(true)}
+                  className="connectButton"
+              >
+                Connect Wallet
+              </button>
+
+              {isClient && window.parent !== window && (
+                <p style={{marginTop: '1rem'}}>(Waiting for identity from Coinbase Wallet...)</p>
+              )}
+            </div>
+          )}
+        </main>
+      </div> 
+      
+      {isModalOpen && (
+        <ConnectModal 
+            onClose={() => setIsModalOpen(false)} 
+            onConnect={handleConnect}
+            onFarcasterConnect={handleFarcasterConnect}
+        />
+      )}
+    </>
   );
 }
+
+
+// --- FarmTracker Bileşeni ---
+interface FarmTrackerProps {
+    userAddress: string;
+}
+const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
+    const getStorageKey = useCallback((key: string) => `${key}-${userAddress}`, [userAddress]);
+    
+    const [projects, setProjects] = useState<Project[]>(() => {
+        if (typeof window === 'undefined') return [];
+        try {
+            const saved = localStorage.getItem(getStorageKey('farm-tracker'));
+            const parsedProjects = saved ? JSON.parse(saved) : [];
+            return parsedProjects.map((p: any) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
+        } catch (error) { return []; }
+    });
+
+    const [newProjectName, setNewProjectName] = useState('');
+    const [sortMethod, setSortMethod] = useState('dateAdded');
+
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem(getStorageKey('farm-tracker'), JSON.stringify(projects));
+        }
+    }, [projects, getStorageKey]);
+    
+    const addProject = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!newProjectName.trim()) return;
+        const newProject: Project = { id: Date.now(), name: newProjectName.trim(), tasks: [], details: { notes: '', website: '', twitter: '' } };
+        setProjects(prev => [newProject, ...prev]);
+        setNewProjectName('');
+    };
+    
+    const exportData = () => { alert('Export not implemented yet.'); };
+    const importData = (event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); };
+
+    const sortedProjects = useMemo(() => {
+        const projectsCopy = [...projects];
+        const getPriorityScore = (priority: string) => ({ high: 3, medium: 2, low: 1 }[priority] || 0);
+        switch (sortMethod) {
+            case 'alphabetical': return projectsCopy.sort((a, b) => a.name.localeCompare(b.name));
+            case 'progress':
+                return projectsCopy.sort((a, b) => {
+                    const progressA = a.tasks.length > 0 ? (a.tasks.filter(t => t.completed).length / a.tasks.length) * 100 : 0;
+                    const progressB = b.tasks.length > 0 ? (b.tasks.filter(t => t.completed).length / b.tasks.length) * 100 : 0;
+                    return progressB - progressA;
+                });
+            case 'priority':
+                 return projectsCopy.sort((a, b) => {
+                    const highA = Math.max(0, ...a.tasks.filter(t => !t.completed).map(t => getPriorityScore(t.priority)));
+                    const highB = Math.max(0, ...b.tasks.filter(t => !t.completed).map(t => getPriorityScore(t.priority)));
+                    return highB - highA;
+                });
+            case 'dateAdded': default: return projectsCopy.sort((a, b) => b.id - a.id);
+        }
+    }, [projects, sortMethod]);
+    
+    return (
+        <div>
+            <div className="top-controls">
+                <div className="data-controls">
+                     <input type="file" id="import-file" style={{ display: 'none' }} onChange={importData} accept=".json" />
+                    <button className="icon-button small-icon-button" onClick={() => (document.getElementById('import-file') as HTMLInputElement)?.click()} title="Import Data">
+                        <Upload size={18} />
+                    </button>
+                    <button className="icon-button small-icon-button" onClick={exportData} title="Export Data">
+                        <Download size={18} />
+                    </button>
+                </div>
+                <div className="sort-control">
+                     <select value={sortMethod} onChange={(e) => setSortMethod(e.target.value)}>
+                        <option value="dateAdded">Sort: Date Added</option>
+                        <option value="alphabetical">Sort: A-Z</option>
+                        <option value="progress">Sort: By Progress</option>
+                        <option value="priority">Sort: By Priority</option>
+                    </select>
+                </div>
+            </div>
+            
+            <form className="project-form" onSubmit={addProject}>
+                <input type="text" placeholder="Add new project (e.g., Aerodrome Finance)" value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
+                <button type="submit">
+                   <Plus size={16} strokeWidth={3} /> Add Project
+                </button>
+            </form>
+            
+            {sortedProjects.map(project => (
+                <ProjectCard key={project.id} project={project} setProjects={setProjects} />
+            ))}
+            {sortedProjects.length === 0 && <p style={{textAlign: 'center', color: 'var(--subtle-text-color)'}}>No projects yet. Add one to start tracking!</p>}
+        </div>
+    );
+};
+
+// --- ProjectCard Bileşeni ---
+interface ProjectCardProps {
+    project: Project;
+    setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
+}
+const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
+    const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+    const [editingText, setEditingText] = useState('');
+    const [isEditingName, setIsEditingName] = useState(false);
+    const [projectName, setProjectName] = useState(project.name);
+    const [newTaskInputs, setNewTaskInputs] = useState({ text: '', dueDate: '', priority: 'medium' as Task['priority'] });
+    const [completedVisible, setCompletedVisible] = useState(false);
+    const [detailsVisible, setDetailsVisible] = useState(false);
+
+    const updateProject = useCallback((updatedData: Partial<Project>) => {
+        setProjects(prevProjects => 
+            prevProjects.map(p => p.id === project.id ? {...p, ...updatedData} : p)
+        );
+    }, [project.id, setProjects]);
+
+    const deleteProject = () => { if (window.confirm('Are you sure you want to delete this project?')) { setProjects(prevProjects => prevProjects.filter(p => p.id !== project.id)); } };
+    const handleTaskInputChange = (field: keyof typeof newTaskInputs, value: string) => setNewTaskInputs(prev => ({...prev, [field]: value }));
+    
+    const addTask = (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        const text = newTaskInputs.text.trim(); 
+        if (!text) return; 
+        const newTask: Task = { id: Date.now(), text, dueDate: newTaskInputs.dueDate || '', priority: newTaskInputs.priority || 'medium', completed: false };
+        updateProject({ tasks: [newTask, ...project.tasks] }); 
+        setNewTaskInputs({ text: '', dueDate: '', priority: 'medium' }); 
+    };
+    
+    const deleteTask = (taskId: number) => { if (window.confirm('Are you sure?')) { updateProject({ tasks: project.tasks.filter(t => t.id !== taskId) }); } };
+    const handleDetailChange = (field: keyof ProjectDetails, value: string) => updateProject({ details: { ...(project.details || { notes: '', website: '', twitter: '' }), [field]: value } });
+    const toggleTask = (taskId: number) => updateProject({ tasks: project.tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t) });
+    
+    const handleEdit = (task: Task) => { setEditingTaskId(task.id); setEditingText(task.text); };
+    const saveEdit = (taskId: number) => {
+        const trimmedText = editingText.trim();
+        if (trimmedText) {
+            updateProject({ tasks: project.tasks.map(t => t.id === taskId ? { ...t, text: trimmedText } : t) });
+        }
+        setEditingTaskId(null); setEditingText('');
+    };
+    const cancelEdit = () => { setEditingTaskId(null); setEditingText(''); };
+    
+    const handleProjectNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') saveProjectName(); else if (e.key === 'Escape') { setProjectName(project.name); setIsEditingName(false); } };
+    const saveProjectName = () => {
+        const trimmedName = projectName.trim();
+        if (trimmedName) updateProject({ name: trimmedName }); else setProjectName(project.name); 
+        setIsEditingName(false);
+    };
+    
+    const formatDate = (dateString: string): string => {
+        if (!dateString) return '';
+        try {
+            const date = new Date(dateString);
+            const userTimezoneOffset = date.getTimezoneOffset() * 60000;
+            const correctedDate = new Date(date.getTime() + userTimezoneOffset);
+            if (isNaN(correctedDate.getTime())) return ''; 
+            return correctedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        } catch (e) { return ''; } 
+    };
+
+    // === DÜZELTİLMİŞ FONKSİYON ===
+    // 'correctedDueDate' (YANLIŞ) -> 'correctedDate' (DOĞRU) olarak düzeltildi.
+    const getDueDateClass = (task: Task): string => {
+        if (!task.dueDate || task.completed) return '';
+        try {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const dueDate = new Date(task.dueDate); 
+            const userTimezoneOffset = dueDate.getTimezoneOffset() * 60000;
+            const correctedDate = new Date(dueDate.getTime() + userTimezoneOffset); // Değişken adı 'correctedDate'
+            if (isNaN(correctedDate.getTime())) return '';
+            correctedDate.setHours(0,0,0,0);
+            
+            // DÜZELTME: 'correctedDueDate' -> 'correctedDate'
+            if (correctedDate < today) return 'overdue';
+            // DÜZELTME: 'correctedDueDate' -> 'correctedDate'
+            if (correctedDate.getTime() === today.getTime()) return 'today';
+        } catch(e) { return ''; }
+        return '';
+    };
+
+    const incompleteTasks = project.tasks.filter(t => !t.completed);
+    const completedTasks = project.tasks.filter(t => t.completed);
+    const progress = project.tasks.length > 0 ? (completedTasks.length / project.tasks.length) * 100 : 0;
+    const PriorityTag = ({priority}: {priority: Task['priority']}) => (<span className={`priority-tag ${priority}`}>{priority}</span>);
+
+    const TaskItem = ({ task }: {task: Task}) => {
+        const isEditing = editingTaskId === task.id;
+        return (
+            <li className="task-item">
+                {isEditing ? (
+                    <form className="edit-task-form" onSubmit={(e) => { e.preventDefault(); saveEdit(task.id); }}>
+                        <input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} autoFocus onBlur={() => saveEdit(task.id)} onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}/>
+                    </form>
+                ) : (
+                    <>
+                        <div className="task-item-main">
+                            <input type="checkbox" id={`task-${task.id}`} checked={task.completed} onChange={() => toggleTask(task.id)} />
+                            <label htmlFor={`task-${task.id}`} className={task.completed ? 'completed' : ''}> {task.text} </label>
+                        </div>
+                        <div className="task-item-actions">
+                            <PriorityTag priority={task.priority} />
+                            {task.dueDate && <span className={`task-due-date ${getDueDateClass(task)}`}> {formatDate(task.dueDate)} </span>}
+                            <button className="action-button edit" onClick={() => handleEdit(task)} aria-label="Edit Task"><Edit2 size={16} /></button>
+                             <button className="action-button delete" onClick={() => deleteTask(task.id)} aria-label="Delete Task"><Trash2 size={16} /></button>
+                        </div>
+                    </>
+                )}
+            </li>
+        );
+    };
+
+    return (
+         <div className="project-card">
+            <div className="project-card-main">
+                <div className="project-header">
+                   <div className="project-header-title">
+                        {isEditingName ? (
+                            <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} onBlur={saveProjectName} onKeyDown={handleProjectNameKeyDown} autoFocus />
+                        ) : (
+                            <>
+                                <h2>{project.name}</h2>
+                                <button className="action-button edit" onClick={() => setIsEditingName(true)} aria-label="Edit Project Name"><Edit2 size={16} /></button>
+                            </>
+                        )}
+                    </div>
+                    <button className="action-button delete" onClick={deleteProject} aria-label="Delete Project"><Trash2 size={20} /></button>
+                </div>
+                {project.tasks.length > 0 && (
+                     <div className="progress-info">
+                        <div className="progress-text">{completedTasks.length} of {project.tasks.length} tasks completed</div>
+                        <div className="progress-bar-container"><div className="progress-bar" style={{width: `${progress}%`}}></div></div>
+                    </div>
+                )}
+                <ul className="task-list">
+                    {incompleteTasks.map(task => (<TaskItem key={task.id} task={task} />))}
+                </ul>
+                <form className="task-form" onSubmit={addTask}>
+                    <input type="text" placeholder="Add new task (e.g., Swap...)" value={newTaskInputs.text} onChange={(e) => handleTaskInputChange('text', e.target.value)} />
+                    <input type="date" value={newTaskInputs.dueDate} onChange={(e) => handleTaskInputChange('dueDate', e.target.value)} />
+                    <select value={newTaskInputs.priority} onChange={(e) => handleTaskInputChange('priority', e.target.value as Task['priority'])}>
+                        <option value="low">Low</option>
+                        <option value="medium">Medium</option>
+                        <option value="high">High</option>
+                    </select>
+                    <button type="submit"><Plus size={14} strokeWidth={3} /> Add</button>
+                </form>
+                 {completedTasks.length > 0 && (
+                     <>
+                        <button className={`completed-section-toggle ${completedVisible ? 'open' : ''}`} onClick={() => setCompletedVisible(prev => !prev)}>
+                            <ChevronRight size={16} /> {completedTasks.length} Completed Tasks
+                        </button>
+                        <div className={`completed-list ${completedVisible ? 'open' : ''}`}>
+                            <ul className="task-list">
+                                {completedTasks.map(task => (<TaskItem key={task.id} task={task} />))}
+                            </ul>
+                        </div>
+                    </>
+                 )}
+            </div>
+            {/* Details (Notlar, Website, Twitter) Bölümü */}
+             <button className={`details-toggle ${detailsVisible ? 'open' : ''}`} onClick={() => setDetailsVisible(prev => !prev)}>
+                 <ChevronRight size={16} /> Details
+             </button>
+             <div className={`project-details ${detailsVisible ? 'open' : ''}`}>
+                 <div className="details-grid">
+                    <div>
+                        <label>Website</label>
+                        <input type="text" placeholder="https://project.com" value={project.details?.website || ''} onChange={(e) => handleDetailChange('website', e.target.value)} />
+                    </div>
+                    <div>
+                        <label>Twitter</label>
+                        <input type="text" placeholder="https://twitter.com/project" value={project.details?.twitter || ''} onChange={(e) => handleDetailChange('twitter', e.target.value)} />
+                    </div>
+                    <div style={{gridColumn: '1 / -1'}}>
+                        <label>Notes</label>
+                        <textarea placeholder="Your strategy, thoughts, next steps..." value={project.details?.notes || ''} onChange={(e) => handleDetailChange('notes', e.target.value)}></textarea>
+                    </div>
+                 </div>
+             </div>
+        </div>
+    );
+};
+
+
+// === Cüzdan Bağlama Popup (Modal) Bileşeni ===
+// İKONLAR SİLİNMİŞ HALİ
+interface ConnectModalProps {
+    onClose: () => void;
+    onConnect: (walletType: 'metamask' | 'coinbase') => void;
+    onFarcasterConnect: () => void;
+}
+const ConnectModal: React.FC<ConnectModalProps> = ({ onClose, onConnect, onFarcasterConnect }) => (
+    <div className="modal-backdrop">
+        <div className="modal-content">
+            <button className="modal-close" onClick={onClose}>&times;</button>
+            <h2>Connect Wallet</h2>
+            <div className="wallet-options">
+                 
+                 <button className="wallet-button" onClick={() => onConnect('metamask')}>
+                    <span>MetaMask</span>
+                </button>
+                 
+                 <button className="wallet-button" onClick={() => onConnect('coinbase')}>
+                    <span>Coinbase Wallet</span>
+                </button>
+                
+                <button className="wallet-button" onClick={() => alert('Rabby Wallet support coming soon!')}>
+                    <span>Rabby Wallet</span>
+                </button>
+                
+                <button className="wallet-button" onClick={onFarcasterConnect}>
+                    <span>Sign in with Farcaster</span>
+                </button>
+            </div>
+        </div>
+    </div>
+);
 
