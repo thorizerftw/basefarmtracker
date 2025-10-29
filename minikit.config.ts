@@ -42,7 +42,7 @@
         primaryCategory: "productivity", 
         tags: ["airdrop", "tracker", "checklist", "productivity", "base"], 
         heroImageUrl: `${ROOT_URL}/basedroptracker-hero.png`, 
-        tagline: "Track your airdrop tasks efficiently with BaseFarmTracker.", 
+        tagline: "Track your airdrop efficiently", 
         ogTitle: "BaseFarm Tracker",
         ogDescription: "Organize your airdrop farming activities privately and securely.",
         ogImageUrl: `${ROOT_URL}/basedroptracker-hero.png`, 
