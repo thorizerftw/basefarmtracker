@@ -19,7 +19,6 @@ interface UserIdentity {
   displayName: string;
 }
 
-// --- VERCEL HATASI DÜZELTİLDİ: 'any' yerine daha spesifik tipler ---
 // 'window.ethereum' için kısmi tip tanımı
 interface EthereumProvider {
   isMetaMask?: boolean;
@@ -30,7 +29,7 @@ interface EthereumProvider {
 
 declare global {
     interface Window {
-        ethers?: unknown; // 'any' yerine 'unknown'
+        ethers?: unknown; 
         ethereum?: EthereumProvider; 
         coinbaseWalletExtension?: EthereumProvider; 
     }
@@ -47,7 +46,6 @@ export default function HomePage() {
   useEffect(() => {
     setIsClient(true); 
     if (window.parent !== window) {
-      // VERCEL HATASI DÜZELTİLDİ: 'event.data' için 'any' yerine tip ataması
       const handleMessage = (event: MessageEvent) => {
         const data = event.data as { type: string; identity?: UserIdentity; theme?: string };
         if (data.type === 'mini-app-identity' && data.identity) {
@@ -69,7 +67,6 @@ export default function HomePage() {
 
   // === CÜZDAN BAĞLAMA FONKSİYONU ===
   const handleConnect = async (walletType: 'metamask' | 'coinbase') => {
-      // VERCEL HATASI DÜZELTİLDİ: 'window.ethers'ı 'any' olarak cast ediyoruz
       const ethers = (window.ethers as any); 
       if (typeof ethers === 'undefined') { 
         alert("Ethers.js library failed to load. Please refresh.");
@@ -88,7 +85,6 @@ export default function HomePage() {
 
       if (walletType === 'metamask') {
           if (ethereum?.providers) {
-              // VERCEL HATASI DÜZELTİLDİ: 'p: any' yerine tip tanımı
               provider = ethereum.providers.find((p) => p.isMetaMask);
           } else if (ethereum?.isMetaMask) {
               provider = ethereum;
@@ -101,7 +97,6 @@ export default function HomePage() {
       else if (walletType === 'coinbase') {
           provider = coinbaseWalletExtension;
           if (!provider && ethereum?.providers) {
-              // VERCEL HATASI DÜZELTİLDİ: 'p: any' yerine tip tanımı
               provider = ethereum.providers.find((p) => p.isCoinbaseWallet);
           }
           if (!provider && ethereum?.isCoinbaseWallet) {
@@ -119,8 +114,8 @@ export default function HomePage() {
       }
 
       try {
-          const ethersProvider = new ethers.providers.Web3Provider(provider, "any"); 
-          // VERCEL HATASI DÜZELTİLDİ: 'accounts'a 'any' yerine tip tanımı
+          // VERCEL HATASI DÜZELTİLDİ: 'provider'ı 'any' olarak cast ettik ve 'network'ü 'undefined' yaptık.
+          const ethersProvider = new ethers.providers.Web3Provider(provider as any, undefined); 
           const accounts = await ethersProvider.send("eth_requestAccounts", []) as string[]; 
           
           if (!accounts || accounts.length === 0) {
@@ -133,15 +128,14 @@ export default function HomePage() {
           setIdentity({ 
               address: address, 
               displayName: 'Browser User',
-              pfpUrl: '' // PFP'yi kaldırdık
+              pfpUrl: '' 
           });
           
           setIsModalOpen(false);
-      } catch (err: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'err: any' yerine 'err: unknown'
+      } catch (err: unknown) { 
           console.error("Connection Error:", err);
-          // Hata tipini kontrol et
           if (typeof err === 'object' && err !== null && 'code' in err && (err as {code: unknown}).code === 4001) { 
-            // Kullanıcı popup'ı kapattı (Reddetti)
+            // Kullanıcı popup'ı kapattı
           } else if (err instanceof Error) {
               alert(`Connection failed: ${err.message}`);
           } else {
@@ -163,7 +157,7 @@ export default function HomePage() {
                   method: 'wallet_revokePermissions', 
                   params: [{ eth_accounts: {} }] 
               });
-          } catch (err: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'err: any' yerine 'err: unknown'
+          } catch (err: unknown) { 
               if (err instanceof Error) {
                 console.warn("Could not revoke permissions:", err.message); 
               }
@@ -202,7 +196,6 @@ export default function HomePage() {
           <h1>BaseFarm Tracker</h1>
           <div className="header-actions">
             
-            {/* PFP (sağ üstteki "52" yazısı) kaldırıldı */}
             {identity && (
               <>
                 <button 
@@ -273,9 +266,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
         try {
             const saved = localStorage.getItem(getStorageKey('farm-tracker'));
             const parsedProjects = saved ? JSON.parse(saved) : [];
-            // VERCEL HATASI DÜZELTİLDİ: 'p: any' yerine tip tanımı
             return parsedProjects.map((p: Project) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
-        } catch (err: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'error' -> 'err', 'any' -> 'unknown'
+        } catch (err: unknown) { 
             if (err instanceof Error) {
               console.warn("Failed to parse projects from localStorage", err.message);
             }
@@ -301,7 +293,6 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     };
     
     const exportData = () => { alert('Export not implemented yet.'); };
-    // VERCEL HATASI DÜZELTİLDİ: 'event' kullanılmadığı için '_event' yapıldı
     const importData = (_event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); };
 
     const sortedProjects = useMemo(() => {
@@ -424,7 +415,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(date.getTime() + userTimezoneOffset);
             if (isNaN(correctedDate.getTime())) return ''; 
             return correctedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        } catch (_e: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'e' -> '_e'
+        // VERCEL HATASI DÜZELTİLDİ: 'e' kullanılmadığı için 'catch {}' yaptık
+        } catch { 
             return ''; 
         } 
     };
@@ -439,7 +431,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             correctedDate.setHours(0,0,0,0);
             if (correctedDate < today) return 'overdue';
             if (correctedDate.getTime() === today.getTime()) return 'today';
-        } catch(_e: unknown) { // VERCEL HATASI DÜZELTİLDİ: 'e' -> '_e'
+        // VERCEL HATASI DÜZELTİLDİ: 'e' kullanılmadığı için 'catch {}' yaptık
+        } catch { 
             return '';
         }
         return '';
