@@ -1,6 +1,6 @@
 'use client';
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-// Kullanılmayan 'Check' ve 'X' importları kaldırıldı.
+// Check ve X kullanılmıyor, kaldırıldı
 import { Moon, Sun, Upload, Download, Plus, ChevronRight, Edit2, Trash2 } from 'lucide-react'; 
 
 // --- Gerekli Tipler (Interfaces) ---
@@ -15,23 +15,16 @@ interface ProjectDetails { notes: string; website: string; twitter: string; }
 interface Project { id: number; name: string; tasks: Task[]; details: ProjectDetails; }
 interface UserIdentity {
   address: string;
-  pfpUrl: string;
+  pfpUrl: string; // Bunu artık kullanmayacağız ama tipte kalsın
   displayName: string;
 }
 
-// 'window.ethereum' için kısmi tip tanımı
-interface EthereumProvider {
-  isMetaMask?: boolean;
-  isCoinbaseWallet?: boolean;
-  providers?: EthereumProvider[];
-  request: (args: { method: string; params?: unknown[] | object }) => Promise<unknown>;
-}
-
+// --- Tarayıcı Tipleri (Ethers.js için) ---
 declare global {
     interface Window {
-        ethers?: unknown; 
-        ethereum?: EthereumProvider; 
-        coinbaseWalletExtension?: EthereumProvider; 
+        ethers?: any; 
+        ethereum?: any; 
+        coinbaseWalletExtension?: any; 
     }
 }
 
@@ -42,52 +35,81 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false); 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // === MANUEL MİNİ-APP KODU ===
+  // === DÜZELTME: ACCOUNT ASSOCIATION KODU (Tip Eklendi) ===
+  // BU KODU base.dev SİTESİNDEN ALIP BURAYA YAPIŞTIRMAN GEREKİYOR!
+  // Şimdilik boş ama tipi string olmalı.
+  const ACCOUNT_ASSOCIATION_STRING: string = ""; 
+  // =======================================================
+
+  // === MANUEL MİNİ-APP KODU (Ready Sinyali Öne Alındı) ===
   useEffect(() => {
     setIsClient(true); 
     if (window.parent !== window) {
       const handleMessage = (event: MessageEvent) => {
-        const data = event.data as { type: string; identity?: UserIdentity; theme?: string };
-        if (data.type === 'mini-app-identity' && data.identity) {
-          setIdentity(data.identity);
+        if (event.data.type === 'mini-app-identity') {
+          console.log("Identity received:", event.data.identity);
+          setIdentity(event.data.identity);
+          // "Ready" sinyalini artık burada GÖNDERMİYORUZ.
         }
-        if (data.type === 'mini-app-theme' && data.theme) {
-          setIsDarkMode(data.theme === 'dark');
+        if (event.data.type === 'mini-app-theme') {
+          setIsDarkMode(event.data.theme === 'dark');
         }
       };
       window.addEventListener('message', handleMessage);
+
+      // 1. "Ben yüklendim" de
+      console.log("Sending mini-app-loaded signal.");
       window.parent.postMessage({ type: 'mini-app-loaded' }, '*');
+      
+      // === YENİ: "Hazırım" sinyalini HEMEN gönder ===
+      console.log("Sending mini-app-ready signal immediately.");
+      window.parent.postMessage({ type: 'mini-app-ready' }, '*');
+      // ===========================================
+      
+      // 3. Hesap İlişkilendirme Kodunu Gönder (varsa)
+      if (ACCOUNT_ASSOCIATION_STRING && ACCOUNT_ASSOCIATION_STRING.startsWith('did:pkh')) {
+          console.log("Sending account association string:", ACCOUNT_ASSOCIATION_STRING);
+          window.parent.postMessage({
+              type: 'mini-app-account-association',
+              accountAssociation: ACCOUNT_ASSOCIATION_STRING
+          }, '*');
+      } else {
+          console.warn("Account Association string is missing or invalid in page.tsx. Get it from base.dev!");
+      }
+
+      // 4. Kimlik İste (Hala istiyoruz, ama "Ready" için beklemiyoruz)
+      console.log("Sending mini-app-request-identity signal.");
       window.parent.postMessage({ type: 'mini-app-request-identity' }, '*');
+
+      // 5. Tema İste
+      console.log("Sending mini-app-request-theme signal.");
       window.parent.postMessage({ type: 'mini-app-request-theme' }, '*');
+      
       return () => {
         window.removeEventListener('message', handleMessage);
       };
     }
-  }, []); 
+  }, []); // Sadece bir kez çalışır
 
   // === CÜZDAN BAĞLAMA FONKSİYONU ===
   const handleConnect = async (walletType: 'metamask' | 'coinbase') => {
-      // VERCEL HATASI (70:40) DÜZELTİLDİ: 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ethers = (window.ethers as any); 
-      if (typeof ethers === 'undefined') { 
+      const ethers = (window as any).ethers; 
+      if (!ethers) { 
         alert("Ethers.js library failed to load. Please refresh.");
         return;
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ethereum = (window as any).ethereum; 
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const coinbaseWalletExtension = (window as any).coinbaseWalletExtension;
       
-      const ethereum = window.ethereum; 
-      const coinbaseWalletExtension = window.coinbaseWalletExtension;
-
-      if (!ethereum && !coinbaseWalletExtension) {
-          alert("No compatible wallet detected!");
-          return;
-      }
-
-      let provider: EthereumProvider | undefined = undefined; 
+      let provider: unknown = null; 
 
       if (walletType === 'metamask') {
           if (ethereum?.providers) {
-              provider = ethereum.providers.find((p) => p.isMetaMask);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              provider = ethereum.providers.find((p: any) => p.isMetaMask);
           } else if (ethereum?.isMetaMask) {
               provider = ethereum;
           }
@@ -99,7 +121,8 @@ export default function HomePage() {
       else if (walletType === 'coinbase') {
           provider = coinbaseWalletExtension;
           if (!provider && ethereum?.providers) {
-              provider = ethereum.providers.find((p) => p.isCoinbaseWallet);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              provider = ethereum.providers.find((p: any) => p.isCoinbaseWallet);
           }
           if (!provider && ethereum?.isCoinbaseWallet) {
               provider = ethereum;
@@ -110,18 +133,12 @@ export default function HomePage() {
           }
       }
 
-      if (!provider) {
-          alert("No compatible provider found.");
-          return;
-      }
-
       try {
-          // VERCEL HATASI (118:80) DÜZELTİLDİ:
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const ethersProvider = new ethers.providers.Web3Provider(provider as any, undefined); 
-          const accounts = await ethersProvider.send("eth_requestAccounts", []) as string[]; 
+          const accounts = await ethersProvider.send("eth_requestAccounts", []); 
           
-          if (!accounts || accounts.length === 0) {
+          if (!Array.isArray(accounts) || accounts.length === 0) {
              throw new Error("No accounts found/selected.");
           }
           
@@ -135,14 +152,20 @@ export default function HomePage() {
           });
           
           setIsModalOpen(false);
-      } catch (err: unknown) { 
+          
+          // Tarayıcıda bağlandıktan sonra "Hazırım" sinyali (eskisi gibi)
+          if (window.parent === window) { 
+             console.log("Browser wallet connected, sending mini-app-ready signal (for consistency).");
+             window.parent.postMessage({ type: 'mini-app-ready' }, '*'); 
+          }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      } catch (err: any) { 
           console.error("Connection Error:", err);
-          if (typeof err === 'object' && err !== null && 'code' in err && (err as {code: unknown}).code === 4001) { 
-            // Kullanıcı popup'ı kapattı
-          } else if (err instanceof Error) {
-              alert(`Connection failed: ${err.message}`);
+          if (err.code === 4001) { 
+            // Kullanıcı popup'ı kapattı (Reddetti)
           } else {
-              alert("An unknown connection error occurred.");
+              alert(`Connection failed: ${err.message || 'Unknown error'}`);
           }
       }
   };
@@ -153,7 +176,8 @@ export default function HomePage() {
 
   // === GERÇEK DISCONNECT FONKSİYONU ===
   const disconnectWallet = async () => {
-      const ethereum = window.ethereum;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const ethereum = (window as any).ethereum;
       if (ethereum && ethereum.request) {
           try {
               await ethereum.request({ 
@@ -161,9 +185,7 @@ export default function HomePage() {
                   params: [{ eth_accounts: {} }] 
               });
           } catch (err: unknown) { 
-              if (err instanceof Error) {
-                console.warn("Could not revoke permissions:", err.message); 
-              }
+              console.warn("Could not revoke permissions:", (err as Error).message); 
           }
       }
       setIdentity(null);
@@ -198,7 +220,6 @@ export default function HomePage() {
         <header className="app-header">
           <h1>BaseFarm Tracker</h1>
           <div className="header-actions">
-            
             {identity && (
               <>
                 <button 
@@ -210,7 +231,6 @@ export default function HomePage() {
                 </button>
               </>
             )}
-            
             <button
               onClick={toggleTheme}
               className="icon-button"
@@ -230,15 +250,22 @@ export default function HomePage() {
                 Please connect to continue.
               </p>
               
-              <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="connectButton"
-              >
-                Connect Wallet
-              </button>
+              {/* Tarayıcıda çalışıyorsak Connect butonu */}
+              {isClient && window.parent === window && (
+                  <button 
+                      onClick={() => setIsModalOpen(true)}
+                      className="connectButton"
+                  >
+                    Connect Wallet
+                  </button>
+              )}
 
-              {isClient && window.parent !== window && (
-                <p style={{marginTop: '1rem'}}>(Waiting for identity from Coinbase Wallet...)</p>
+              {/* Mini-App içindeysek (ve kimlik bekleniyorsa) mesaj */}
+              {isClient && window.parent !== window && !identity && (
+                <p style={{marginTop: '1rem'}}>
+                    (Waiting for identity from Coinbase Wallet...)
+                    {ACCOUNT_ASSOCIATION_STRING ? '' : ' Account Association missing!'}
+                </p>
               )}
             </div>
           )}
@@ -258,6 +285,7 @@ export default function HomePage() {
 
 
 // --- FarmTracker Bileşeni ---
+// (Hiçbir değişiklik yok)
 interface FarmTrackerProps {
     userAddress: string;
 }
@@ -268,10 +296,12 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
         if (typeof window === 'undefined') return [];
         try {
             const saved = localStorage.getItem(getStorageKey('farm-tracker'));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const parsedProjects = saved ? JSON.parse(saved) : [];
-            return parsedProjects.map((p: Project) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            return parsedProjects.map((p: any) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
         } catch (err: unknown) { 
-            if (err instanceof Error) {
+             if (err instanceof Error) {
               console.warn("Failed to parse projects from localStorage", err.message);
             }
             return []; 
@@ -295,9 +325,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
         setNewProjectName('');
     };
     
-    // VERCEL HATASI DÜZELTİLDİ: '_event' -> 'event' (kullanılıyor)
     const exportData = () => { alert('Export not implemented yet.'); };
-    const importData = (_event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); };
+    const importData = (_event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); }; 
 
     const sortedProjects = useMemo(() => {
         const projectsCopy = [...projects];
@@ -324,7 +353,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
         <div>
             <div className="top-controls">
                 <div className="data-controls">
-                     <input type="file" id="import-file" style={{ display: 'none' }} onChange={importData} accept=".json" />
+                     <input type="file" id="import-file" className="hidden" onChange={importData} accept=".json" />
                     <button className="icon-button small-icon-button" onClick={() => (document.getElementById('import-file') as HTMLInputElement)?.click()} title="Import Data">
                         <Upload size={18} />
                     </button>
@@ -333,7 +362,9 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
                     </button>
                 </div>
                 <div className="sort-control">
-                     <select value={sortMethod} onChange={(e) => setSortMethod(e.target.value)}>
+                     <select value={sortMethod} onChange={(e) => setSortMethod(e.target.value)}
+                       className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                     >
                         <option value="dateAdded">Sort: Date Added</option>
                         <option value="alphabetical">Sort: A-Z</option>
                         <option value="progress">Sort: By Progress</option>
@@ -343,16 +374,22 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
             </div>
             
             <form className="project-form" onSubmit={addProject}>
-                <input type="text" placeholder="Add new project (e.g., Aerodrome Finance)" value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
-                <button type="submit">
+                <input type="text" placeholder="Add new project (e.g., Aerodrome Finance)" value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} 
+                  className="flex-grow p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <button type="submit"
+                  className="px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2"
+                >
                    <Plus size={16} strokeWidth={3} /> Add Project
                 </button>
             </form>
             
-            {sortedProjects.map(project => (
-                <ProjectCard key={project.id} project={project} setProjects={setProjects} />
-            ))}
-            {sortedProjects.length === 0 && <p style={{textAlign: 'center', color: 'var(--subtle-text-color)'}}>No projects yet. Add one to start tracking!</p>}
+            <div className="space-y-6">
+              {sortedProjects.map(project => (
+                  <ProjectCard key={project.id} project={project} setProjects={setProjects} />
+              ))}
+            </div>
+            {sortedProjects.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 mt-8">No projects yet. Add one to start tracking!</p>}
         </div>
     );
 };
@@ -432,8 +469,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(dueDate.getTime() + userTimezoneOffset); 
             if (isNaN(correctedDate.getTime())) return '';
             correctedDate.setHours(0,0,0,0);
-            if (correctedDate < today) return 'overdue';
-            if (correctedDate.getTime() === today.getTime()) return 'today';
+            if (correctedDate < today) return 'text-red-600 dark:text-red-400 font-medium'; // overdue
+            if (correctedDate.getTime() === today.getTime()) return 'text-blue-600 dark:text-blue-400 font-medium'; // today
         } catch { 
             return '';
         }
@@ -442,28 +479,71 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
 
     const incompleteTasks = project.tasks.filter(t => !t.completed);
     const completedTasks = project.tasks.filter(t => t.completed);
-    const progress = project.tasks.length > 0 ? (completedTasks.length / project.tasks.length) * 100 : 0;
-    const PriorityTag = ({priority}: {priority: Task['priority']}) => (<span className={`priority-tag ${priority}`}>{priority}</span>);
+    const progress = project.tasks.length > 0 ? Math.round((completedTasks.length / project.tasks.length) * 100) : 0;
+    
+    const priorityClasses = {
+      low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+      high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+    }
+    const PriorityTag = ({priority}: {priority: Task['priority']}) => (
+      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${priorityClasses[priority] || priorityClasses['medium']}`}>
+        {priority}
+      </span>
+    );
 
     const TaskItem = ({ task }: {task: Task}) => {
         const isEditing = editingTaskId === task.id;
         return (
-            <li className="task-item">
+            <li className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition group">
                 {isEditing ? (
-                    <form className="edit-task-form" onSubmit={(e) => { e.preventDefault(); saveEdit(task.id); }}>
-                        <input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} autoFocus onBlur={() => saveEdit(task.id)} onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}/>
+                    <form className="flex-grow" onSubmit={(e) => { e.preventDefault(); saveEdit(task.id); }}>
+                        <input 
+                          type="text" 
+                          value={editingText} 
+                          onChange={(e) => setEditingText(e.target.value)} 
+                          autoFocus 
+                          onBlur={() => saveEdit(task.id)} 
+                          onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}
+                          className="w-full p-1 border border-blue-500 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none"
+                        />
                     </form>
                 ) : (
                     <>
-                        <div className="task-item-main">
-                            <input type="checkbox" id={`task-${task.id}`} checked={task.completed} onChange={() => toggleTask(task.id)} />
-                            <label htmlFor={`task-${task.id}`} className={task.completed ? 'completed' : ''}> {task.text} </label>
+                        <div className="flex-grow flex items-center gap-3 cursor-pointer" onClick={() => toggleTask(task.id)}>
+                            <input 
+                              type="checkbox" 
+                              id={`task-${task.id}`} 
+                              checked={task.completed} 
+                              readOnly 
+                              className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                            />
+                            <label htmlFor={`task-${task.id}`} className={`flex-grow ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}> 
+                              {task.text} 
+                            </label>
                         </div>
-                        <div className="task-item-actions">
+                        
+                        <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
                             <PriorityTag priority={task.priority} />
-                            {task.dueDate && <span className={`task-due-date ${getDueDateClass(task)}`}> {formatDate(task.dueDate)} </span>}
-                            <button className="action-button edit" onClick={() => handleEdit(task)} aria-label="Edit Task"><Edit2 size={16} /></button>
-                             <button className="action-button delete" onClick={() => deleteTask(task.id)} aria-label="Delete Task"><Trash2 size={16} /></button>
+                            {task.dueDate && (
+                              <span className={`text-sm text-gray-500 dark:text-gray-400 ${getDueDateClass(task)}`}> 
+                                {formatDate(task.dueDate)} 
+                              </span>
+                            )}
+                            <button 
+                              className="p-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" 
+                              onClick={() => handleEdit(task)} 
+                              aria-label="Edit Task"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                             <button 
+                               className="p-1 text-gray-500 hover:text-red-600 dark:hover:text-red-400" 
+                               onClick={() => deleteTask(task.id)} 
+                               aria-label="Delete Task"
+                             >
+                               <Trash2 size={16} />
+                             </button>
                         </div>
                     </>
                 )}
@@ -472,72 +552,152 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     };
 
     return (
-         <div className="project-card">
-            <div className="project-card-main">
-                <div className="project-header">
-                   <div className="project-header-title">
+         <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
+            <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                   <div className="flex items-center gap-2">
                         {isEditingName ? (
-                            <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} onBlur={saveProjectName} onKeyDown={handleProjectNameKeyDown} autoFocus />
+                            <input 
+                              type="text" 
+                              value={projectName} 
+                              onChange={(e) => setProjectName(e.target.value)} 
+                              onBlur={saveProjectName} 
+                              onKeyDown={handleProjectNameKeyDown} 
+                              autoFocus 
+                              className="text-xl font-semibold p-1 border border-blue-500 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none"
+                            />
                         ) : (
                             <>
-                                <h2>{project.name}</h2>
-                                <button className="action-button edit" onClick={() => setIsEditingName(true)} aria-label="Edit Project Name"><Edit2 size={16} /></button>
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{project.name}</h2>
+                                <button 
+                                  className="p-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" 
+                                  onClick={() => setIsEditingName(true)} 
+                                  aria-label="Edit Project Name"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
                             </>
                         )}
                     </div>
-                    <button className="action-button delete" onClick={deleteProject} aria-label="Delete Project"><Trash2 size={20} /></button>
+                    <button 
+                      className="p-1 text-gray-500 hover:text-red-600 dark:hover:text-red-400" 
+                      onClick={deleteProject} 
+                      aria-label="Delete Project"
+                    >
+                      <Trash2 size={20} />
+                    </button>
                 </div>
+                
                 {project.tasks.length > 0 && (
-                     <div className="progress-info">
-                        <div className="progress-text">{completedTasks.length} of {project.tasks.length} tasks completed</div>
-                        <div className="progress-bar-container"><div className="progress-bar" style={{width: `${progress}%`}}></div></div>
+                     <div className="mb-4">
+                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+                          <span>Progress</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                            style={{width: `${progress}%`}}
+                          ></div>
+                        </div>
                     </div>
                 )}
-                <ul className="task-list">
+                
+                <ul className="space-y-1 mb-4">
                     {incompleteTasks.map(task => (<TaskItem key={task.id} task={task} />))}
                 </ul>
-                <form className="task-form" onSubmit={addTask}>
-                    <input type="text" placeholder="Add new task (e.g., Swap...)" value={newTaskInputs.text} onChange={(e) => handleTaskInputChange('text', e.target.value)} />
-                    <input type="date" value={newTaskInputs.dueDate} onChange={(e) => handleTaskInputChange('dueDate', e.target.value)} />
-                    <select value={newTaskInputs.priority} onChange={(e) => handleTaskInputChange('priority', e.target.value as Task['priority'])}>
+                
+                <form className="flex gap-2 flex-wrap" onSubmit={addTask}>
+                    <input 
+                      type="text" 
+                      placeholder="Add new task..." 
+                      value={newTaskInputs.text} 
+                      onChange={(e) => handleTaskInputChange('text', e.target.value)} 
+                      className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input 
+                      type="date" 
+                      value={newTaskInputs.dueDate} 
+                      onChange={(e) => handleTaskInputChange('dueDate', e.target.value)} 
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <select 
+                      value={newTaskInputs.priority} 
+                      onChange={(e) => handleTaskInputChange('priority', e.target.value as Task['priority'])}
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
-                    <button type="submit"><Plus size={14} strokeWidth={3} /> Add</button>
+                    <button 
+                      type="submit"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition flex items-center gap-1"
+                    >
+                      <Plus size={14} strokeWidth={3} /> Add
+                    </button>
                 </form>
+                 
                  {completedTasks.length > 0 && (
-                     <>
-                        <button className={`completed-section-toggle ${completedVisible ? 'open' : ''}`} onClick={() => setCompletedVisible(prev => !prev)}>
-                            <ChevronRight size={16} /> {completedTasks.length} Completed Tasks
+                     <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
+                        <button 
+                          className={`w-full flex justify-between items-center text-left text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white py-1 ${completedVisible ? 'mb-2' : ''}`} 
+                          onClick={() => setCompletedVisible(prev => !prev)}
+                        >
+                            <span>{completedTasks.length} Completed Tasks</span>
+                            <ChevronRight size={16} className={`transform transition-transform ${completedVisible ? 'rotate-90' : ''}`} />
                         </button>
-                        <div className={`completed-list ${completedVisible ? 'open' : ''}`}>
-                            <ul className="task-list">
+                        <div className={`overflow-hidden transition-all duration-300 ease-in-out ${completedVisible ? 'max-h-96' : 'max-h-0'}`}>
+                            <ul className="space-y-1 border-l-2 border-gray-300 dark:border-gray-600 pl-4 ml-2">
                                 {completedTasks.map(task => (<TaskItem key={task.id} task={task} />))}
                             </ul>
                         </div>
-                    </>
+                    </div>
                  )}
             </div>
-            {/* Details (Notlar, Website, Twitter) Bölümü */}
-             <button className={`details-toggle ${detailsVisible ? 'open' : ''}`} onClick={() => setDetailsVisible(prev => !prev)}>
-                 <ChevronRight size={16} /> Details
-             </button>
-             <div className={`project-details ${detailsVisible ? 'open' : ''}`}>
-                 <div className="details-grid">
+            
+             <div className="border-t border-gray-200 dark:border-gray-700">
+               <button 
+                 className={`w-full flex justify-between items-center text-left p-4 text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 ${detailsVisible ? 'bg-gray-100 dark:bg-gray-700' : ''}`} 
+                 onClick={() => setDetailsVisible(prev => !prev)}
+               >
+                   <span>Details</span>
+                   <ChevronRight size={16} className={`transform transition-transform ${detailsVisible ? 'rotate-90' : ''}`} />
+               </button>
+               <div className={`overflow-hidden transition-all duration-300 ease-in-out ${detailsVisible ? 'max-h-96' : 'max-h-0'}`}>
+                 <div className="p-4 grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-100 dark:bg-gray-700">
                     <div>
-                        <label>Website</label>
-                        <input type="text" placeholder="https://project.com" value={project.details?.website || ''} onChange={(e) => handleDetailChange('website', e.target.value)} />
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Website</label>
+                        <input 
+                          type="text" 
+                          placeholder="https://project.com" 
+                          value={project.details?.website || ''} 
+                          onChange={(e) => handleDetailChange('website', e.target.value)} 
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
                     </div>
                     <div>
-                        <label>Twitter</label>
-                        <input type="text" placeholder="https://twitter.com/project" value={project.details?.twitter || ''} onChange={(e) => handleDetailChange('twitter', e.target.value)} />
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Twitter</label>
+                        <input 
+                          type="text" 
+                          placeholder="https://twitter.com/project" 
+                          value={project.details?.twitter || ''} 
+                          onChange={(e) => handleDetailChange('twitter', e.target.value)} 
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
                     </div>
-                    <div style={{gridColumn: '1 / -1'}}>
-                        <label>Notes</label>
-                        <textarea placeholder="Your strategy, thoughts, next steps..." value={project.details?.notes || ''} onChange={(e) => handleDetailChange('notes', e.target.value)}></textarea>
+                    <div className="md:col-span-2">
+                        <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Notes</label>
+                        <textarea 
+                          placeholder="Your strategy, thoughts, next steps..." 
+                          value={project.details?.notes || ''} 
+                          onChange={(e) => handleDetailChange('notes', e.target.value)}
+                          rows={3}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 resize-y"
+                        ></textarea>
                     </div>
                  </div>
+               </div>
              </div>
         </div>
     );
@@ -554,23 +714,39 @@ const ConnectModal: React.FC<ConnectModalProps> = ({ onClose, onConnect, onFarca
     <div className="modal-backdrop">
         <div className="modal-content">
             <button className="modal-close" onClick={onClose}>&times;</button>
-            <h2>Connect Wallet</h2>
-            <div className="wallet-options">
+            <h2 className="text-lg font-semibold mb-4 text-center">Connect Wallet</h2>
+            <div className="space-y-3">
                  
-                 <button className="wallet-button" onClick={() => onConnect('metamask')}>
-                    <span>MetaMask</span>
+                 {/* MetaMask */}
+                 <button className="w-full flex items-center justify-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition" onClick={() => onConnect('metamask')}>
+                    {/* SVG İkon */}
+                    <svg width="24" height="24" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid"><path d="M252.6 128.4L128 253.2L3.4 128.4L128 3.6l124.6 124.8z" fill="#E2761B"></path><path d="M128 3.6l-37.8 97.1l-23.5 32.2l61.3-61.9V3.6z" fill="#E2761B"></path><path d="M128 3.6v97.1l61.3 61.9l-23.5-32.2L128 3.6z" fill="#E37A20"></path><path d="M128 128.4l-61.3 61.9l21-47.5l40.3-14.4z" fill="#E37A20"></path><path d="M128 128.4l61.3 61.9l-21-47.5l-40.3-14.4z" fill="#E47D22"></path><path d="M86.8 142.7l41.2 88.3l41.2-88.3l-41.2-32.5l-41.2 32.5z" fill="#F6851B"></path><path d="M128 231l41.2-88.3L128 110.2V231z" fill="#E37A20"></path><path d="M48 163.1l-6.8 19.3c-2 5.8 4.8 11 10.3 7.8l20-11.6L48 163.1z" fill="#E2761B"></path><path d="M71.5 178.6l20 11.6c5.5 3.1 12.3-2 10.3-7.8l-6.8-19.3L71.5 178.6z" fill="#E37A20"></path><path d="M95 190.2l-6.8 19.3c-2 5.8 4.8 11 10.3 7.8l20-11.6L95 190.2z" fill="#E2761B"></path><path d="M118.5 205.8l20 11.6c5.5 3.1 12.3-2 10.3-7.8l-6.8-19.3L118.5 205.8z" fill="#E37A20"></path><path d="M162.8 163.1l23.5 15.5l-20-11.6c-5.5-3.1-12.3 2-10.3 7.8L162.8 163.1z" fill="#E2761B"></path><path d="M186.3 178.6L162.8 163.1l6.8 19.3c2 5.8 8.8 7.9 10.3 7.8L186.3 178.6z" fill="#E37A20"></path><path d="M210 190.2l-23.5-15.5l-6.8 19.3c-2 5.8 4.8 11 10.3 7.8L210 190.2z" fill="#E2761B"></path><path d="M203.2 182.4c2-5.8 8.8-7.9 10.3-7.8l-20 11.6L203.2 182.4z" fill="#E37A20"></path><path d="M128 128.4l-61.3-61.9L44.8 128l22.4 31.6l60.8-31.2z" fill="#D56A17"></path><path d="M128 128.4l61.3-61.9L211.2 128l-22.4 31.6l-60.8-31.2z" fill="#E2761B"></path><path d="M86.8 142.7l-19.6 15.1L44.8 128l22.4-31.6l19.6 46.3z" fill="#E2761B"></path><path d="M169.2 142.7l19.6 15.1L211.2 128l-22.4-31.6l-19.6 46.3z" fill="#E37A20"></path><path d="M86.8 142.7l41.2-32.5v60.1l-41.2-27.6z" fill="#C06015"></path><path d="M128 110.2l41.2 32.5v-60.1L128 110.2z" fill="#D56A17"></path></svg>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">MetaMask</span>
                 </button>
                  
-                 <button className="wallet-button" onClick={() => onConnect('coinbase')}>
-                    <span>Coinbase Wallet</span>
+                 {/* Coinbase */}
+                 <button className="w-full flex items-center justify-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition" onClick={() => onConnect('coinbase')}>
+                    {/* SVG İkon */}
+                    <svg width="24" height="24" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M16 32C24.8366 32 32 24.8366 32 16C32 7.16344 24.8366 0 16 0C7.16344 0 0 7.16344 0 16C0 24.8366 7.16344 32 16 32ZM16 23.513C20.1477 23.513 23.513 20.1477 23.513 16C23.513 11.8523 20.1477 8.48697 16 8.48697C11.8523 8.48697 8.48697 11.8523 8.48697 16C8.48697 20.1477 11.8523 23.513 16 23.513ZM16 21.513C19.0401 21.513 21.513 19.0401 21.513 16C21.513 12.9599 19.0401 10.487 16 10.487C12.9599 10.487 10.487 12.9599 10.487 16C10.487 19.0401 12.9599 21.513 16 21.513Z" fill="#0052FF"></path><path d="M12.96 12.96H19.04V19.04H12.96V12.96Z" fill="#0052FF"></path></svg>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Coinbase Wallet</span>
                 </button>
                 
-                <button className="wallet-button" onClick={() => alert('Rabby Wallet support coming soon!')}>
-                    <span>Rabby Wallet</span>
+                {/* Rabby */}
+                <button className="w-full flex items-center justify-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition" onClick={() => alert('Rabby Wallet support coming soon!')}>
+                     <img 
+                       src="https://static.debank.com/image/project/logo_url/rabby/28c113b284d3367a13c548f430543685.png" 
+                       alt="Rabby Wallet Logo"
+                       width="24" height="24" 
+                       onError={(e) => (e.currentTarget.style.display = 'none')} 
+                     />
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Rabby Wallet</span>
                 </button>
                 
-                <button className="wallet-button" onClick={onFarcasterConnect}>
-                    <span>Sign in with Farcaster</span>
+                {/* Farcaster */}
+                <button className="w-full flex items-center justify-center gap-3 p-3 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition" onClick={onFarcasterConnect}>
+                    {/* SVG İkon */}
+                    <svg width="24" height="24" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg"><path fillRule="evenodd" clipRule="evenodd" d="M20 40C31.0457 40 40 31.0457 40 20C40 8.9543 31.0457 0 20 0C8.9543 0 0 8.9543 0 20C0 31.0457 8.9543 40 20 40ZM20 29.3C25.1201 29.3 29.3 25.1201 29.3 20C29.3 14.8799 25.1201 10.7 20 10.7C14.8799 10.7 10.7 14.8799 10.7 20C10.7 25.1201 14.8799 29.3 20 29.3ZM20 26.3C23.4801 26.3 26.3 23.4801 26.3 20C26.3 16.5199 23.4801 13.7 20 13.7C16.5199 13.7 13.7 16.5199 13.7 20C13.7 23.4801 16.5199 26.3 20 26.3ZM15.8 15.8H20V20H15.8V15.8Z" fill="#8A63D2"></path></svg>
+                    <span className="font-medium text-gray-900 dark:text-gray-100">Sign in with Farcaster</span>
                 </button>
             </div>
         </div>
