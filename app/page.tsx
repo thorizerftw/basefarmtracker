@@ -20,7 +20,6 @@ interface UserIdentity {
 }
 
 // --- Tarayıcı Tipleri (Ethers.js için) ---
-// === DÜZELTME: Vercel'in "any" hatalarını susturuyoruz ===
 declare global {
     interface Window {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,7 +30,6 @@ declare global {
         coinbaseWalletExtension?: any; 
     }
 }
-// =======================================================
 
 // --- Ana Sayfa Bileşeni ---
 export default function HomePage() {
@@ -259,10 +257,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
             const parsedProjects = saved ? JSON.parse(saved) : [];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return parsedProjects.map((p: any) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
-        } catch (err: unknown) { // Hata değişkenini kullanmıyorsak _ ile başlat
-             if (err instanceof Error) {
-              console.warn("Failed to parse projects from localStorage", err.message);
-            }
+        } catch { // <-- DÜZELTME: Hata değişkeni tamamen kaldırıldı
+             console.warn("Failed to parse projects from localStorage");
             return []; 
         }
     });
@@ -285,7 +281,6 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     };
     
     const exportData = () => { alert('Export not implemented yet.'); };
-    // Vercel hatasını çözmek için 'event' yerine '_event'
     const importData = (_event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); }; 
 
     const sortedProjects = useMemo(() => {
@@ -408,7 +403,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(date.getTime() + userTimezoneOffset);
             if (isNaN(correctedDate.getTime())) return ''; 
             return correctedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        } catch (_err: unknown) { // Hata değişkenini kullanmıyorsak _ ile başlat
+        } catch { // <-- DÜZELTME: Hata değişkeni tamamen kaldırıldı
             return ''; 
         } 
     };
@@ -423,7 +418,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             correctedDate.setHours(0,0,0,0);
             if (correctedDate < today) return 'overdue';
             if (correctedDate.getTime() === today.getTime()) return 'today';
-        } catch (_err: unknown) { // Hata değişkenini kullanmıyorsak _ ile başlat
+        } catch { // <-- DÜZELTME: Hata değişkeni tamamen kaldırıldı
             return '';
         }
         return '';
