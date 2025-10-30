@@ -25,7 +25,7 @@ export const minikitConfig: MiniAppManifest = {
     description:
       "A personal and private airdrop farming checklist. Track your tasks, deadlines, and priorities for multiple projects, all locked to your crypto wallet.",
     
-    // SENİN DOSYA İSİMLERİNDEKİ YAZIM HATASINI DÜZELTTİM ('basedroptAcker')
+    // Dosya isimleri (public klasöründe olduklarını varsayarak)
     screenshotUrls: [`${ROOT_URL}/basedroptracker-portrait.png`],
     iconUrl: `${ROOT_URL}/basedroptracker-icon.png`,
     splashImageUrl: `${ROOT_URL}/basedroptracker-hero.png`,
@@ -47,7 +47,10 @@ export const minikitConfig: MiniAppManifest = {
 // Bu, Farcaster'ın 'imageUrl' hatasını çözer
 declare global {
   interface MiniAppManifest {
-    miniapp: MiniAppManifest["miniapp"] & {
+    // VERCEL HATASININ ÇÖZÜMÜ:
+    // 'MiniAppManifest["miniapp"]' yerine 'any' kullanarak
+    // sonsuz döngü hatasını (recursive type) çözüyoruz.
+    miniapp: any & {
       heroImageUrl?: string;
       ogTitle?: string;
       ogDescription?: string;
