@@ -20,6 +20,8 @@ interface UserIdentity {
 }
 
 // --- Tarayıcı Tipleri (Ethers.js için) ---
+// === DÜZELTME: Vercel'in 'any' hatalarını susturmak için ===
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 declare global {
     interface Window {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -30,6 +32,7 @@ declare global {
         coinbaseWalletExtension?: any; 
     }
 }
+// ========================================================
 
 // --- Ana Sayfa Bileşeni ---
 export default function HomePage() {
@@ -38,27 +41,70 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false); 
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // === MANUEL MİNİ-APP KODU (Coinbase Wallet için) ===
+  // === ACCOUNT ASSOCIATION KODU ===
+  // BU KODU base.dev SİTESİNDEN ALIP BURAYA YAPIŞTIRMAN GEREKİYOR!
+  const ACCOUNT_ASSOCIATION_STRING: string = ""; // <--- KODU BURAYA YAPIŞTIR!
+  // ===================================
+
+  // === MANUEL MİNİ-APP KODU (Account Association Eklendi + Ready Sinyali Düzeltildi) ===
   useEffect(() => {
     setIsClient(true); 
     if (window.parent !== window) {
       const handleMessage = (event: MessageEvent) => {
+        // Kimlik bilgisi GELDİĞİNDE...
         if (event.data.type === 'mini-app-identity') {
+          console.log("Identity received:", event.data.identity);
           setIdentity(event.data.identity);
+          // ...HEMEN "Hazırım" sinyalini gönder.
+          console.log("Sending mini-app-ready signal.");
+          window.parent.postMessage({ type: 'mini-app-ready' }, '*');
         }
+        // Tema bilgisi geldiğinde...
         if (event.data.type === 'mini-app-theme') {
+          console.log("Theme received:", event.data.theme);
           setIsDarkMode(event.data.theme === 'dark');
         }
       };
       window.addEventListener('message', handleMessage);
+
+      // 1. "Ben yüklendim" de.
+      console.log("Sending mini-app-loaded signal.");
       window.parent.postMessage({ type: 'mini-app-loaded' }, '*');
+      
+      // 2. Hesap İlişkilendirme Kodunu Gönder (varsa).
+      if (ACCOUNT_ASSOCIATION_STRING && ACCOUNT_ASSOCIATION_STRING.startsWith('did:pkh')) {
+          console.log("Sending account association string:", ACCOUNT_ASSOCIATION_STRING);
+          window.parent.postMessage({
+              type: 'mini-app-account-association',
+              accountAssociation: ACCOUNT_ASSOCIATION_STRING
+          }, '*');
+      } else {
+          console.warn("Account Association string is missing or invalid in page.tsx. Get it from base.dev! Preview might stay 'Not Ready'.");
+          
+          // === DÜZELTME: "Not Ready" Sorunu ===
+          // Eğer Association kodu YOKSA, kimlik gelmeyecek.
+          // Kimlik gelmeyince 'mini-app-ready' sinyali gitmeyecek.
+          // Bu yüzden, kod YOKSA, "Hazırım" sinyalini HEMEN gönderiyoruz.
+          // (Videodaki "önce ready yap" mantığı bu.)
+          if (window.parent !== window) {
+            console.log("No Association string, sending 'mini-app-ready' signal immediately.");
+            window.parent.postMessage({ type: 'mini-app-ready' }, '*');
+          }
+      }
+
+      // 3. Kimlik İste (İlişkilendirme gönderildikten sonra bu çalışmalı).
+      console.log("Sending mini-app-request-identity signal.");
       window.parent.postMessage({ type: 'mini-app-request-identity' }, '*');
+
+      // 4. Tema İste.
+      console.log("Sending mini-app-request-theme signal.");
       window.parent.postMessage({ type: 'mini-app-request-theme' }, '*');
+      
       return () => {
         window.removeEventListener('message', handleMessage);
       };
     }
-  }, []); 
+  }, [ACCOUNT_ASSOCIATION_STRING]); // useEffect'i association değişirse tekrar çalıştır
 
   // === CÜZDAN BAĞLAMA FONKSİYONU ===
   const handleConnect = async (walletType: 'metamask' | 'coinbase') => {
@@ -121,7 +167,14 @@ export default function HomePage() {
           });
           
           setIsModalOpen(false);
-      } catch (err: unknown) { // 'unknown' kullanıyoruz
+          
+          // Tarayıcıda bağlandıktan sonra da 'ready' sinyali gönderelim (base.dev için)
+          if (window.parent === window) { 
+             console.log("Browser wallet connected, sending mini-app-ready signal.");
+             window.parent.postMessage({ type: 'mini-app-ready' }, '*'); 
+          }
+
+      } catch (err: unknown) { 
           console.error("Connection Error:", err);
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const errorCode = (err as any)?.code;
@@ -215,15 +268,22 @@ export default function HomePage() {
                 Please connect to continue.
               </p>
               
-              <button 
-                  onClick={() => setIsModalOpen(true)}
-                  className="connectButton"
-              >
-                Connect Wallet
-              </button>
+              {/* Tarayıcıda çalışıyorsak Connect butonu */}
+              {isClient && window.parent === window && (
+                  <button 
+                      onClick={() => setIsModalOpen(true)}
+                      className="connectButton"
+                  >
+                    Connect Wallet
+                  </button>
+              )}
 
-              {isClient && window.parent !== window && (
-                <p style={{marginTop: '1rem'}}>(Waiting for identity from Coinbase Wallet...)</p>
+              {/* Mini-App içindeysek (ve kimlik bekleniyorsa) mesaj */}
+              {isClient && window.parent !== window && !identity && (
+                <p style={{marginTop: '1rem'}}>
+                    (Waiting for identity from Coinbase Wallet...)
+                    {ACCOUNT_ASSOCIATION_STRING ? '' : ' Account Association missing!'}
+                </p>
               )}
             </div>
           )}
@@ -257,7 +317,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
             const parsedProjects = saved ? JSON.parse(saved) : [];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return parsedProjects.map((p: any) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
-        } catch { // <-- DÜZELTME: Hata değişkeni tamamen kaldırıldı
+        // === DÜZELTME: Hata değişkeni tamamen kaldırıldı ===
+        } catch { 
              console.warn("Failed to parse projects from localStorage");
             return []; 
         }
@@ -281,6 +342,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     };
     
     const exportData = () => { alert('Export not implemented yet.'); };
+    // Kullanılmayan değişken _ ile başlatıldı
     const importData = (_event: React.ChangeEvent<HTMLInputElement>) => { alert('Import not implemented yet.'); }; 
 
     const sortedProjects = useMemo(() => {
@@ -403,7 +465,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(date.getTime() + userTimezoneOffset);
             if (isNaN(correctedDate.getTime())) return ''; 
             return correctedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        } catch { // <-- DÜZELTME: Hata değişkeni tamamen kaldırıldı
+        // === DÜZELTME: Hata değişkeni tamamen kaldırıldı ===
+        } catch { 
             return ''; 
         } 
     };
@@ -418,7 +481,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             correctedDate.setHours(0,0,0,0);
             if (correctedDate < today) return 'overdue';
             if (correctedDate.getTime() === today.getTime()) return 'today';
-        } catch { // <-- DÜZELTME: Hata değişkeni tamamen kaldırıldı
+        // === DÜZELTME: Hata değişkeni tamamen kaldırıldı ===
+        } catch { 
             return '';
         }
         return '';
@@ -547,22 +611,22 @@ const ConnectModal: React.FC<ConnectModalProps> = ({ onClose, onConnect, onFarca
             <div className="wallet-options">
                  
                  <button className="wallet-button" onClick={() => onConnect('metamask')}>
-                    {/* SVG/IMG SİLİNDİ */}
+                    {/* İkonlar Silindi */}
                     <span>MetaMask</span>
                 </button>
                  
                  <button className="wallet-button" onClick={() => onConnect('coinbase')}>
-                    {/* SVG/IMG SİLİNDİ */}
+                    {/* İkonlar Silindi */}
                     <span>Coinbase Wallet</span>
                 </button>
                 
                 <button className="wallet-button" onClick={() => alert('Rabby Wallet support coming soon!')}>
-                     {/* SVG/IMG SİLİNDİ */}
+                     {/* İkonlar Silindi */}
                     <span>Rabby Wallet</span>
                 </button>
                 
                 <button className="wallet-button" onClick={onFarcasterConnect}>
-                    {/* SVG/IMG SİLİNDİ */}
+                    {/* İkonlar Silindi */}
                     <span>Sign in with Farcaster</span>
                 </button>
             </div>
