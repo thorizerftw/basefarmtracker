@@ -4,7 +4,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 
 // İkonlar (lucide-react)
-// VERCEL HATASI DÜZELTMESİ: Kullanılmayan 'ChevronRight' ve 'Edit2' ikonları kaldırıldı.
 import { Moon, Sun, Upload, Download, Plus, Trash2 } from 'lucide-react';
 
 // useTheme hook'u (Doğru paket 'next-themes' paketidir)
@@ -12,7 +11,6 @@ import { useTheme } from 'next-themes';
 
 // ----------------------------------------------------------------
 // --- Gerekli Tipler (Interfaces) ---
-// BU HATAYI ÇÖZER: 'Task' tipini en üst seviyede tanımlıyoruz
 // ----------------------------------------------------------------
 interface Task {
   id: number;
@@ -46,13 +44,10 @@ type User = {
 // --- Ana Sayfa Bileşeni ---
 export default function HomePage() {
   // === TEMA DÜZELTMESİ (Arkadaşının koduna göre değil, next-themes'e göre) ===
-  // 'isDarkMode' ve 'toggleTheme' yerine 'theme' ve 'setTheme' kullanıyoruz.
   const { theme, setTheme } = useTheme();
-  // 'toggleTheme' fonksiyonunu kendimiz tanımlıyoruz
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
-  // Tailwind'in 'dark' modunu algılaması için mevcut temayı 'isDarkMode' boolean'ına çeviriyoruz
   const isDarkMode = theme === 'dark';
   // --- TEMA DÜZELTMESİ SONU ---
 
@@ -62,9 +57,11 @@ export default function HomePage() {
   // Arkadaşının kodundaki 'buildUserProfile' fonksiyonu
   async function buildUserProfile(address: string): Promise<User> {
     try {
-      // VERCEL ESLINT DÜZELTMESİ: 'any' tipi yerine daha spesifik bir tip kullanıldı
+      // 1. HATA (ESLint - any) ÇÖZÜMÜ:
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const w = window as Window & { ethereum?: any; miniapp?: any };
       if (w.ethereum?.isCoinbaseWallet && w.ethereum?.coinbase?.getUser) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const user = await w.ethereum.coinbase.getUser();
         const display = user?.data?.profile?.displayName;
         const image = user?.data?.profile?.profileImageUrl;
@@ -88,7 +85,8 @@ export default function HomePage() {
 
   // Cüzdan Bağlanma Fonksiyonu
   const handleConnect = useCallback(async () => {
-    // VERCEL ESLINT DÜZELTMESİ: 'any' tipi yerine daha spesifik bir tip kullanıldı
+    // 1. HATA (ESLint - any) ÇÖZÜMÜ:
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum = (window as Window & { ethereum?: any }).ethereum;
     if (!ethereum) {
       alert("Please install a wallet extension like MetaMask or use Coinbase Wallet.");
@@ -117,7 +115,8 @@ export default function HomePage() {
     const savedAddress = localStorage.getItem("baseapp_connected_user_address");
     if (!savedAddress) return;
 
-    // VERCEL ESLINT DÜZELTMESİ: 'any' tipi yerine daha spesifik bir tip kullanıldı
+    // 1. HATA (ESLint - any) ÇÖZÜMÜ:
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum = (window as Window & { ethereum?: any }).ethereum;
     if (!ethereum) return;
 
@@ -138,6 +137,8 @@ export default function HomePage() {
 
   // Hesap değişimini dinle
   useEffect(() => {
+    // 1. HATA (ESLint - any) ÇÖZÜMÜ:
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum = (window as Window & { ethereum?: any }).ethereum;
     if (!ethereum || !ethereum.on) return;
 
@@ -160,10 +161,10 @@ export default function HomePage() {
   }, [currentUser, handleConnect, handleDisconnect]);
 
   // --- MİNİ-APP "READY" SİNYALİ (Arkadaşının kodundan alındı) ---
-  // Bu useEffect, uygulamanın Base App içinde "hazır" olduğunu bildirir.
   useEffect(() => {
     const tryReady = () => {
-      // VERCEL ESLINT DÜZELTMESİ: 'any' tipi yerine daha spesifik bir tip kullanıldı
+      // 1. HATA (ESLint - any) ÇÖZÜMÜ:
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const m = (window as Window & { miniapp?: any })?.miniapp;
       if (!m) return false;
 
@@ -277,8 +278,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
         if (typeof window === 'undefined') return [];
         try {
             const saved = localStorage.getItem(getStorageKey('farm-tracker'));
-            const parsedProjects = saved ? JSON.parse(saved) : [];
-            // VERCEL ESLINT DÜZELTMESİ: 'any' tipi yerine 'Project' tipi kullanıldı
+            // 1. HATA (ESLint - any) ÇÖZÜMÜ: JSON.parse() 'any' döndürür, 'as Project[]' ile tipini belirtiyoruz
+            const parsedProjects = saved ? JSON.parse(saved) as Project[] : [];
             return parsedProjects.map((p: Project) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
         } catch { 
              console.warn("Failed to parse projects from localStorage");
@@ -401,14 +402,16 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
 };
 
 // --- ProjectCard Bileşeni ---
-// (Bütün manuel CSS'leri Tailwind sınıflarıyla değiştirdim)
 interface ProjectCardProps {
     project: Project;
     setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
 }
 const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
-    const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
-    const [editingText, setEditingText] = useState('');
+    // 2. HATA (Kullanılmayan Değişken) ÇÖZÜMÜ:
+    // 'handleEdit' ile ilgili tüm state'ler kaldırıldı
+    // const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+    // const [editingText, setEditingText] = useState('');
+    
     const [isEditingName, setIsEditingName] = useState(false);
     const [projectName, setProjectName] = useState(project.name);
     const [newTaskInputs, setNewTaskInputs] = useState({ text: '', dueDate: '', priority: 'medium' as Task['priority'] });
@@ -447,15 +450,15 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     
     const toggleTask = (taskId: number) => updateProject({ tasks: project.tasks.map(t => t.id === taskId ? { ...t, completed: !t.completed } : t) });
     
-    const handleEdit = (task: Task) => { setEditingTaskId(task.id); setEditingText(task.text); };
-    const saveEdit = (taskId: number) => {
-        const trimmedText = editingText.trim();
-        if (trimmedText) {
-            updateProject({ tasks: project.tasks.map(t => t.id === taskId ? { ...t, text: trimmedText } : t) });
-        }
-        setEditingTaskId(null); setEditingText('');
-    };
-    const cancelEdit = () => { setEditingTaskId(null); setEditingText(''); };
+    // 2. HATA (Kullanılmayan Fonksiyon) ÇÖZÜMÜ:
+    // 'handleEdit' fonksiyonu kaldırıldı
+    // const handleEdit = (task: Task) => { setEditingTaskId(task.id); setEditingText(task.text); };
+    
+    // 'saveEdit' fonksiyonu 'handleEdit'e bağımlıydı, o da kaldırıldı
+    // const saveEdit = (taskId: number) => { ... };
+    
+    // 'cancelEdit' fonksiyonu da kaldırıldı
+    // const cancelEdit = () => { setEditingTaskId(null); setEditingText(''); };
     
     const handleProjectNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => { if (e.key === 'Enter') saveProjectName(); else if (e.key === 'Escape') { setProjectName(project.name); setIsEditingName(false); } };
     const saveProjectName = () => {
@@ -504,7 +507,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
       high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
     }
     
-    // BU HATAYI ÇÖZER: 'Task' tipi en üstte tanımlı olduğu için burada görülebilir.
     const PriorityTag = ({priority}: {priority: Task['priority']}) => (
       <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${priorityClasses[priority] || priorityClasses['medium']}`}>
         {priority}
@@ -512,57 +514,40 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     );
 
     // Task (Görev) Bileşeni (Tailwind ile)
-    // BU HATAYI ÇÖZER: 'Task' tipi en üstte tanımlı olduğu için burada görülebilir.
     const TaskItem = ({ task }: {task: Task}) => {
-        const isEditing = editingTaskId === task.id;
+        // 2. HATA (Kullanılmayan Değişken) ÇÖZÜMÜ:
+        // 'isEditing' ve ilgili tüm mantık kaldırıldı
         return (
             <li className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition group">
-                {isEditing ? (
-                    <form className="flex-grow" onSubmit={(e) => { e.preventDefault(); saveEdit(task.id); }}>
-                        <input 
-                          type="text" 
-                          value={editingText} 
-                          onChange={(e) => setEditingText(e.target.value)} 
-                          autoFocus 
-                          onBlur={() => saveEdit(task.id)} 
-                          onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}
-                          className="w-full p-1 border border-blue-500 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none"
-                        />
-                    </form>
-                ) : (
-                    <>
-                        <div className="flex-grow flex items-center gap-3 cursor-pointer" onClick={() => toggleTask(task.id)}>
-                            <input 
-                              type="checkbox" 
-                              id={`task-${task.id}`} 
-                              checked={task.completed} 
-                              readOnly 
-                              className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
-                            />
-                            <label htmlFor={`task-${task.id}`} className={`flex-grow ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}> 
-                              {task.text} 
-                            </label>
-                        </div>
-                        
-                        {/* Task'ın sağ tarafındaki butonlar (Tailwind ile) */}
-                        <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
-                            <PriorityTag priority={task.priority} />
-                            {task.dueDate && (
-                              <span className={`text-sm text-gray-500 dark:text-gray-400 ${getDueDateClass(task)}`}> 
-                                {formatDate(task.dueDate)} 
-                              </span>
-                            )}
-                            {/* 'Edit2' ikonu burada kullanılmadığı için importu silindi */}
-                             <button 
-                               className="p-1 text-gray-500 hover:text-red-600 dark:hover:text-red-400" 
-                               onClick={() => deleteTask(task.id)} 
-                               aria-label="Delete Task"
-                             >
-                               <Trash2 size={16} />
-                             </button>
-                        </div>
-                    </>
-                )}
+                <div className="flex-grow flex items-center gap-3 cursor-pointer" onClick={() => toggleTask(task.id)}>
+                    <input 
+                      type="checkbox" 
+                      id={`task-${task.id}`} 
+                      checked={task.completed} 
+                      readOnly 
+                      className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                    />
+                    <label htmlFor={`task-${task.id}`} className={`flex-grow ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}> 
+                      {task.text} 
+                    </label>
+                </div>
+                
+                {/* Task'ın sağ tarafındaki butonlar (Tailwind ile) */}
+                <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
+                    <PriorityTag priority={task.priority} />
+                    {task.dueDate && (
+                      <span className={`text-sm text-gray-500 dark:text-gray-400 ${getDueDateClass(task)}`}> 
+                        {formatDate(task.dueDate)} 
+                      </span>
+                    )}
+                     <button 
+                       className="p-1 text-gray-500 hover:text-red-600 dark:hover:text-red-400" 
+                       onClick={() => deleteTask(task.id)} 
+                       aria-label="Delete Task"
+                     >
+                       <Trash2 size={16} />
+                     </button>
+                </div>
             </li>
         );
     };
@@ -587,7 +572,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                         ) : (
                             <>
                                 <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{project.name}</h2>
-                                {/* 'Edit2' ikonu burada kullanılmadığı için importu silindi */}
+                                {/* Düzenle butonu kaldırıldı */}
                             </>
                         )}
                     </div>
@@ -660,7 +645,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                           className={`flex items-center gap-1 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition ${completedVisible ? 'mb-2' : ''}`} 
                           onClick={() => setCompletedVisible(prev => !prev)}
                         >
-                            {/* 'ChevronRight' ikonu burada kullanılmadığı için importu silindi */}
                             <span className={`transition-transform ${completedVisible ? 'rotate-90' : ''}`}>▶</span> 
                             {completedTasks.length} Completed Tasks
                         </button>
@@ -678,7 +662,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                className={`w-full flex items-center gap-1 p-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition border-t border-gray-200 dark:border-gray-700 ${detailsVisible ? 'bg-gray-100 dark:bg-gray-700' : ''}`} 
                onClick={() => setDetailsVisible(prev => !prev)}
              >
-                 {/* 'ChevronRight' ikonu burada kullanılmadığı için importu silindi */}
                  <span className={`transition-transform ${detailsVisible ? 'rotate-90' : ''}`}>▶</span> 
                  Details
              </button>

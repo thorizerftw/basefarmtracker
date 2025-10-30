@@ -1,16 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // VERCEL HATA DÜZELTMESİ:
-  // 'Module not found: Can't resolve '@react-native-async-storage/async-storage''
-  // hatasını çözmek için.
-  // Bu ayar, Next.js'e web build'i yaparken bu mobil paketi
-  // görmezden gelmesini (boş bir modül ile değiştirmesini) söyler.
+  // 3. Hata (Module not found) için çözüm:
+  // Webpack'e bu paketleri web build'ine dahil etmemesini söylüyoruz.
   webpack: (config, { isServer }) => {
-    // Sadece client tarafı build'i için
     if (!isServer) {
+      // Don't resolve these modules on the client side
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        '@react-native-async-storage/async-storage': false,
+        '@react-native-async-storage/async-storage': false, // MetaMask SDK hatası için
+        'pino-pretty': false, // WalletConnect (pino) hatası için
       };
     }
     return config;
@@ -18,3 +16,4 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
+
