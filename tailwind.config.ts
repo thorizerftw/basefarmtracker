@@ -5,9 +5,14 @@ const config: Config = {
   darkMode: 'class', 
   
   content: [
-    './src/pages/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/components/**/*.{js,ts,jsx,tsx,mdx}',
-    './src/app/**/*.{js,ts,jsx,tsx,mdx}',
+    // DOSYA YOLU DÜZELTMESİ:
+    // Projen 'src' klasörü kullanmıyor, bu yüzden 'src/' kaldırıldı.
+    './app/**/*.{js,ts,jsx,tsx,mdx}', 
+    
+    // Varsa diye 'pages' ve 'components' için de düzeltme
+    './pages/**/*.{js,ts,jsx,tsx,mdx}',
+    './components/**/*.{js,ts,jsx,tsx,mdx}',
+
     // OnchainKit'in stil dosyalarını okuması için bu yol ŞART
     './node_modules/@coinbase/onchainkit/**/*.{js,ts,jsx,tsx}', 
   ],

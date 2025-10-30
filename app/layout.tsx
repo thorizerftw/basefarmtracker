@@ -1,40 +1,14 @@
-import './globals.css';
-// OnchainKit'in ana stil dosyası (Tailwind'den sonra)
-import '@coinbase/onchainkit/styles.css'; 
-import { RootProvider } from '@/app/rootProvider'; 
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+import './globals.css'; // <-- 1. Global CSS dosyasını (yukarıdaki) import ediyoruz.
+import { RootProvider } from './rootProvider'; // <-- 2. rootProvider'ı (wallet/tema) import ediyoruz.
 
-// minikit.config.ts'ten bilgileri al
-import { minikitConfig } from '../minikit.config'; 
+const inter = Inter({ subsets: ['latin'] });
 
-const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
-
-// === BU FONKSİYON base.dev'in GÖRSELİ GÖRMESİ İÇİN ŞART ===
-export async function generateMetadata(): Promise<Metadata> {
-  const miniapp = minikitConfig.miniapp;
-  return {
-    title: miniapp.name,
-    description: miniapp.description,
-    other: {
-      // Bu 'fc:miniapp' etiketleri o dökümandaki (embeds-and-previews)
-      // "Image Preview" sorununu çözen asıl şeydir.
-      "fc:miniapp": JSON.stringify({
-        version: miniapp.version,
-        // Döküman 'imageUrl' olarak 'heroImageUrl'i istiyor
-        imageUrl: miniapp.heroImageUrl, 
-        button: {
-          title: `Join the ${miniapp.name}`, // Dökümandaki "Join the..."
-          action: {
-            name: `Launch ${miniapp.name}`,
-            url: `${miniapp.homeUrl}`,
-          },
-        },
-      }),
-    },
-  };
-}
-// =======================================================
+export const metadata: Metadata = {
+  title: 'BaseFarm Tracker',
+  description: 'Personal Airdrop Checklist',
+};
 
 export default function RootLayout({
   children,
@@ -42,11 +16,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en">
-      <body className={`${inter.variable}`}>
+    // 'suppressHydrationWarning' uyarısını eklemek, next-themes için iyi bir pratiktir.
+    <html lang="en" suppressHydrationWarning>
+      <body className={inter.className}>
+        {/* 3. Tüm uygulamayı (children) RootProvider ile sarmalıyoruz. */}
         <RootProvider>{children}</RootProvider>
       </body>
     </html>
   );
 }
-
