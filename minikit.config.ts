@@ -29,13 +29,13 @@ export const minikitConfig: MiniAppManifest & { baseBuilder?: { ownerAddress: st
     description: "A personal and private airdrop farming checklist. Track your tasks, deadlines, and priorities for multiple projects, all locked to your crypto wallet.",
     
     // Gerçek dosya isimleri ('a' harfi eklendi)
-    screenshotUrls: [`${ROOT_URL}/basedroptacker-portrait.png`], 
-    iconUrl: `${ROOT_URL}/basedroptacker-icon.png`,             
-    splashImageUrl: `${ROOT_URL}/basedroptacker-hero.png`,       
+    screenshotUrls: [`${ROOT_URL}/basedroptracker-portrait.png`], 
+    iconUrl: `${ROOT_URL}/basedroptracker-icon.png`,             
+    splashImageUrl: `${ROOT_URL}/basedroptracker-hero.png`,       
 
     // === YENİ: base.dev PREVIEW İÇİN GEREKLİ ===
     // Hata mesajı bunu istiyordu
-    imageUrl: `${ROOT_URL}/basedroptacker-hero.png`, 
+    imageUrl: `${ROOT_URL}/basedroptracker-hero.png`, 
     // ===========================================
 
     splashBackgroundColor: "#0052FF", 
@@ -45,14 +45,14 @@ export const minikitConfig: MiniAppManifest & { baseBuilder?: { ownerAddress: st
     tags: ["airdrop", "tracker", "checklist", "productivity", "base"], 
     
     // Gerçek dosya isimleri ('a' harfi eklendi)
-    heroImageUrl: `${ROOT_URL}/basedroptacker-hero.png`, 
+    heroImageUrl: `${ROOT_URL}/basedroptracker-hero.png`, 
     
     tagline: "Track your airdrop efficiently", 
     ogTitle: "BaseFarm Tracker",
     ogDescription: "Organize your airdrop farming activities privately and securely.",
     
     // Gerçek dosya isimleri ('a' harfi eklendi)
-    ogImageUrl: `${ROOT_URL}/basedroptacker-hero.png`, 
+    ogImageUrl: `${ROOT_URL}/basedroptracker-hero.png`, 
   },
 } as const;
 
