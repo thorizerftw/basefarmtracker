@@ -1,7 +1,24 @@
+// app/page.tsx dosyasının en üstündeki TÜM importları bununla değiştirin
+
 'use client';
+
+// React import'ları (Bunlar zaten doğruydu)
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-// Check ve X kullanılmıyor, kaldırıldı
-import { Moon, Sun, Upload, Download, Plus, ChevronRight, Edit2, Trash2 } from 'lucide-react'; 
+
+// İkon import'ları (Bunlar da doğruydu)
+import { Moon, Sun, Upload, Download, Plus, ChevronRight, Edit2, Trash2 } from 'lucide-react';
+
+// ---- DÜZELTİLMİŞ KISIM ----
+// OnchainKit hook'ları ana paketten DEĞİL, '/minikit' alt yolundan geliyor
+import { useMiniApp, useIdentity, SafeArea } from '@coinbase/onchainkit/minikit'; 
+
+// useTheme hook'u 'next-themes' paketinden gelir (Bu kısım doğruydu)
+import { useTheme } from 'next-themes';
+// --------------------------
+
+// ----- Buradan sonra sayfanın geri kalanı devam etsin -----
+
+// ----- Buradan sonra sayfanın geri kalanı devam etsin -----
 
 // --- Gerekli Tipler (Interfaces) ---
 interface Task {
@@ -13,296 +30,95 @@ interface Task {
 }
 interface ProjectDetails { notes: string; website: string; twitter: string; }
 interface Project { id: number; name: string; tasks: Task[]; details: ProjectDetails; }
-interface UserIdentity {
-  address: string;
-  pfpUrl: string; // Bunu artık kullanmayacağız ama tipte kalsın
-  displayName: string;
-}
-
-// --- Tarayıcı Tipleri (Ethers.js için) ---
-// === DÜZELTME: Vercel'in 'any' hatalarını susturmak için ===
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-declare global {
-    interface Window {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ethers?: any; 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ethereum?: any; 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        coinbaseWalletExtension?: any; 
-    }
-}
-// ========================================================
+// 'UserIdentity' tipine artık gerek yok, 'useIdentity' kendi tipini kullanır
 
 // --- Ana Sayfa Bileşeni ---
 export default function HomePage() {
-  const [identity, setIdentity] = useState<UserIdentity | null>(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
+  
+  // === YENİ (DOĞRU) SİSTEM ===
+  const { isDarkMode, toggleTheme } = useTheme();
+  const { identity } = useIdentity();
+  
+  // BU HOOK, 'mini-app-loaded' VE 'mini-app-ready' sinyallerini OTOMATİK gönderir.
+  // "Not Ready" sorununu BU ÇÖZECEK.
+  useMiniApp(); 
+  // ============================
+
   const [isClient, setIsClient] = useState(false); 
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  // === ACCOUNT ASSOCIATION KODU ===
-  // BU KODU base.dev SİTESİNDEN ALIP BURAYA YAPIŞTIRMAN GEREKİYOR!
-  const ACCOUNT_ASSOCIATION_STRING: string = ""; // <--- KODU BURAYA YAPIŞTIR!
-  // ===================================
-
-  // === MANUEL MİNİ-APP KODU (Account Association Eklendi + Ready Sinyali Düzeltildi) ===
+  
+  // === TEMA KODU (TAILWIND İÇİN) ===
   useEffect(() => {
     setIsClient(true); 
-    if (window.parent !== window) {
-      const handleMessage = (event: MessageEvent) => {
-        // Kimlik bilgisi GELDİĞİNDE...
-        if (event.data.type === 'mini-app-identity') {
-          console.log("Identity received:", event.data.identity);
-          setIdentity(event.data.identity);
-          // ...HEMEN "Hazırım" sinyalini gönder.
-          console.log("Sending mini-app-ready signal.");
-          window.parent.postMessage({ type: 'mini-app-ready' }, '*');
-        }
-        // Tema bilgisi geldiğinde...
-        if (event.data.type === 'mini-app-theme') {
-          console.log("Theme received:", event.data.theme);
-          setIsDarkMode(event.data.theme === 'dark');
-        }
-      };
-      window.addEventListener('message', handleMessage);
-
-      // 1. "Ben yüklendim" de.
-      console.log("Sending mini-app-loaded signal.");
-      window.parent.postMessage({ type: 'mini-app-loaded' }, '*');
-      
-      // 2. Hesap İlişkilendirme Kodunu Gönder (varsa).
-      if (ACCOUNT_ASSOCIATION_STRING && ACCOUNT_ASSOCIATION_STRING.startsWith('did:pkh')) {
-          console.log("Sending account association string:", ACCOUNT_ASSOCIATION_STRING);
-          window.parent.postMessage({
-              type: 'mini-app-account-association',
-              accountAssociation: ACCOUNT_ASSOCIATION_STRING
-          }, '*');
-      } else {
-          console.warn("Account Association string is missing or invalid in page.tsx. Get it from base.dev! Preview might stay 'Not Ready'.");
-          
-          // === DÜZELTME: "Not Ready" Sorunu ===
-          // Eğer Association kodu YOKSA, kimlik gelmeyecek.
-          // Kimlik gelmeyince 'mini-app-ready' sinyali gitmeyecek.
-          // Bu yüzden, kod YOKSA, "Hazırım" sinyalini HEMEN gönderiyoruz.
-          // (Videodaki "önce ready yap" mantığı bu.)
-          if (window.parent !== window) {
-            console.log("No Association string, sending 'mini-app-ready' signal immediately.");
-            window.parent.postMessage({ type: 'mini-app-ready' }, '*');
-          }
-      }
-
-      // 3. Kimlik İste (İlişkilendirme gönderildikten sonra bu çalışmalı).
-      console.log("Sending mini-app-request-identity signal.");
-      window.parent.postMessage({ type: 'mini-app-request-identity' }, '*');
-
-      // 4. Tema İste.
-      console.log("Sending mini-app-request-theme signal.");
-      window.parent.postMessage({ type: 'mini-app-request-theme' }, '*');
-      
-      return () => {
-        window.removeEventListener('message', handleMessage);
-      };
+    const root = window.document.documentElement; // <html> etiketi
+    if (isDarkMode) {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
     }
-  }, [ACCOUNT_ASSOCIATION_STRING]); // useEffect'i association değişirse tekrar çalıştır
+  }, [isDarkMode]); // 'isDarkMode' değiştiğinde bu kod çalışır
 
-  // === CÜZDAN BAĞLAMA FONKSİYONU ===
-  const handleConnect = async (walletType: 'metamask' | 'coinbase') => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ethers = (window as any).ethers; 
-      if (!ethers) { 
-        alert("Ethers.js library failed to load. Please refresh.");
-        return;
-      }
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ethereum = (window as any).ethereum; 
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const coinbaseWalletExtension = (window as any).coinbaseWalletExtension;
-      
-      let provider: unknown = null; 
-
-      if (walletType === 'metamask') {
-          if (ethereum?.providers) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              provider = ethereum.providers.find((p: any) => p.isMetaMask);
-          } else if (ethereum?.isMetaMask) {
-              provider = ethereum;
-          }
-          if (!provider) {
-              alert("MetaMask not found. Please install the extension.");
-              return;
-          }
-      } 
-      else if (walletType === 'coinbase') {
-          provider = coinbaseWalletExtension;
-          if (!provider && ethereum?.providers) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              provider = ethereum.providers.find((p: any) => p.isCoinbaseWallet);
-          }
-          if (!provider && ethereum?.isCoinbaseWallet) {
-              provider = ethereum;
-          }
-          if (!provider) {
-              alert("Coinbase Wallet not found. Please install the extension.");
-              return;
-          }
-      }
-
-      try {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const ethersProvider = new ethers.providers.Web3Provider(provider as any, undefined); 
-          const accounts = await ethersProvider.send("eth_requestAccounts", []); 
-          
-          if (!Array.isArray(accounts) || accounts.length === 0) {
-             throw new Error("No accounts found/selected.");
-          }
-          
-          const signer = ethersProvider.getSigner();
-          const address = await signer.getAddress();
-          
-          setIdentity({ 
-              address: address, 
-              displayName: 'Browser User',
-              pfpUrl: '' 
-          });
-          
-          setIsModalOpen(false);
-          
-          // Tarayıcıda bağlandıktan sonra da 'ready' sinyali gönderelim (base.dev için)
-          if (window.parent === window) { 
-             console.log("Browser wallet connected, sending mini-app-ready signal.");
-             window.parent.postMessage({ type: 'mini-app-ready' }, '*'); 
-          }
-
-      } catch (err: unknown) { 
-          console.error("Connection Error:", err);
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const errorCode = (err as any)?.code;
-          if (errorCode === 4001) { 
-            // Kullanıcı popup'ı kapattı (Reddetti)
-          } else {
-              alert(`Connection failed: ${(err as Error).message || 'Unknown error'}`);
-          }
-      }
-  };
-  
-  const handleFarcasterConnect = () => {
-      alert("Farcaster sign-in only works inside the Coinbase Wallet Mini-App.");
-  };
-
-  // === GERÇEK DISCONNECT FONKSİYONU ===
-  const disconnectWallet = async () => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const ethereum = (window as any).ethereum;
-      if (ethereum && ethereum.request) {
-          try {
-              await ethereum.request({ 
-                  method: 'wallet_revokePermissions', 
-                  params: [{ eth_accounts: {} }] 
-              });
-          } catch (err: unknown) { 
-              console.warn("Could not revoke permissions:", (err as Error).message); 
-          }
-      }
-      setIdentity(null);
-  }
-
-  // === TEMA KODU ===
-  useEffect(() => {
-    if (isClient) { 
-        if (isDarkMode) {
-            document.body.classList.add('dark');
-        } else {
-            document.body.classList.remove('dark');
-        }
-    }
-  }, [isDarkMode, isClient]);
-
-  const toggleTheme = () => {
-    const newTheme = !isDarkMode;
-    setIsDarkMode(newTheme);
-    if (window.parent !== window) {
-        window.parent.postMessage({ type: 'mini-app-set-theme', theme: newTheme ? 'dark' : 'light' }, '*');
-    }
-  };
 
   if (!isClient) {
     return null;
   }
 
   return (
-    <>
-      <div className="app-container">
-        <header className="app-header">
-          <h1>BaseFarm Tracker</h1>
-          <div className="header-actions">
-            
-            {identity && (
-              <>
-                <button 
-                  onClick={disconnectWallet} 
-                  className="connectButton disconnect"
-                  style={{padding: '0.6rem 1rem'}}
-                >
-                  Disconnect
-                </button>
-              </>
-            )}
-            
-            <button
-              onClick={toggleTheme}
-              className="icon-button"
-              aria-label="Toggle theme"
-            >
-              {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
-            </button>
-          </div>
-        </header>
-
-        <main>
-          {identity ? (
-            <FarmTracker userAddress={identity.address} />
-          ) : (
-            <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--subtle-text-color)' }}>
-              <p style={{ marginBottom: '1.5rem', fontSize: '1.1rem' }}>
-                Please connect to continue.
-              </p>
-              
-              {/* Tarayıcıda çalışıyorsak Connect butonu */}
-              {isClient && window.parent === window && (
-                  <button 
-                      onClick={() => setIsModalOpen(true)}
-                      className="connectButton"
-                  >
-                    Connect Wallet
-                  </button>
+    <SafeArea>
+      {/* Tailwind Sınıfları */}
+      <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+        <div className="w-full max-w-3xl bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6">
+          
+          {/* Header (Tailwind ile) */}
+          <header className="flex justify-between items-center pb-4 border-b border-gray-200 dark:border-gray-700">
+            <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+              BaseFarm Tracker
+            </h1>
+            <div className="flex items-center gap-3">
+              {identity?.pfpUrl && (
+                <img 
+                  src={identity.pfpUrl} 
+                  alt="PFP" 
+                  className="w-10 h-10 rounded-full border-2 border-gray-200 dark:border-gray-700"
+                  onError={(e) => (e.currentTarget.style.display = 'none')}
+                />
               )}
-
-              {/* Mini-App içindeysek (ve kimlik bekleniyorsa) mesaj */}
-              {isClient && window.parent !== window && !identity && (
-                <p style={{marginTop: '1rem'}}>
-                    (Waiting for identity from Coinbase Wallet...)
-                    {ACCOUNT_ASSOCIATION_STRING ? '' : ' Account Association missing!'}
-                </p>
-              )}
+              <button
+                onClick={toggleTheme}
+                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-200 dark:hover:bg-gray-600 transition"
+                aria-label="Toggle theme"
+              >
+                {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
+              </button>
             </div>
-          )}
-        </main>
-      </div> 
-      
-      {isModalOpen && (
-        <ConnectModal 
-            onClose={() => setIsModalOpen(false)} 
-            onConnect={handleConnect}
-            onFarcasterConnect={handleFarcasterConnect}
-        />
-      )}
-    </>
+          </header>
+
+          <main className="mt-6">
+            {identity ? (
+              // KİMLİK VARSA -> FarmTracker'ı göster
+              <FarmTracker userAddress={identity.address} />
+            ) : (
+              // KİMLİK YOKSA -> Yükleniyor...
+              // (Bu ekran 'Account Association' yapana kadar görünür)
+              <div className="text-center p-8 bg-gray-50 dark:bg-gray-700 rounded-lg">
+                <p className="text-lg font-medium text-gray-700 dark:text-gray-200">
+                  (Waiting for identity from Coinbase Wallet...)
+                </p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
+                  Please ensure you are running this inside the Base App or Coinbase Wallet.
+                </p>
+              </div>
+            )}
+          </main>
+
+        </div>
+      </div>
+    </SafeArea>
   );
 }
 
 
 // --- FarmTracker Bileşeni ---
+// (Bütün manuel CSS'leri Tailwind sınıflarıyla değiştirdim)
 interface FarmTrackerProps {
     userAddress: string;
 }
@@ -317,7 +133,6 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
             const parsedProjects = saved ? JSON.parse(saved) : [];
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             return parsedProjects.map((p: any) => ({ ...p, details: p.details || { notes: '', website: '', twitter: '' } }));
-        // === DÜZELTME: Hata değişkeni tamamen kaldırıldı ===
         } catch { 
              console.warn("Failed to parse projects from localStorage");
             return []; 
@@ -367,19 +182,34 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     }, [projects, sortMethod]);
     
     return (
-        <div>
-            <div className="top-controls">
-                <div className="data-controls">
-                     <input type="file" id="import-file" style={{display: 'none'}} onChange={importData} accept=".json" />
-                    <button className="icon-button small-icon-button" onClick={() => (document.getElementById('import-file') as HTMLInputElement)?.click()} title="Import Data">
+        // TAILWIND KODLARI
+        <div className="space-y-6">
+            <div className="flex justify-between items-center flex-wrap gap-4">
+                <div className="flex gap-2">
+                     <input type="file" id="import-file" className="hidden" onChange={importData} accept=".json" />
+                    <button 
+                      className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition" 
+                      onClick={() => (document.getElementById('import-file') as HTMLInputElement)?.click()} 
+                      title="Import Data"
+                    >
                         <Upload size={18} />
                     </button>
-                    <button className="icon-button small-icon-button" onClick={exportData} title="Export Data">
+                    <button 
+                      className="p-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition" 
+                      onClick={exportData} 
+                      title="Export Data"
+                    >
                         <Download size={18} />
                     </button>
                 </div>
-                <div className="sort-control">
-                     <select value={sortMethod} onChange={(e) => setSortMethod(e.target.value)}>
+                
+                <div>
+                     <select 
+                       value={sortMethod} 
+                       onChange={(e) => setSortMethod(e.target.value)}
+                       // TAILWIND Stilleri
+                       className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                     >
                         <option value="dateAdded">Sort: Date Added</option>
                         <option value="alphabetical">Sort: A-Z</option>
                         <option value="progress">Sort: By Progress</option>
@@ -388,22 +218,37 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
                 </div>
             </div>
             
-            <form className="project-form" onSubmit={addProject}>
-                <input type="text" placeholder="Add new project (e.g., Aerodrome Finance)" value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} />
-                <button type="submit">
+            {/* Proje Ekleme Formu (Tailwind ile) */}
+            <form className="flex gap-2" onSubmit={addProject}>
+                <input 
+                  type="text" 
+                  placeholder="Add new project (e.g., Aerodrome Finance)" 
+                  value={newProjectName} 
+                  onChange={(e) => setNewProjectName(e.target.value)} 
+                  className="flex-grow p-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                />
+                <button 
+                  type="submit"
+                  className="px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition flex items-center gap-2"
+                >
                    <Plus size={16} strokeWidth={3} /> Add Project
                 </button>
             </form>
             
-            {sortedProjects.map(project => (
-                <ProjectCard key={project.id} project={project} setProjects={setProjects} />
-            ))}
-            {sortedProjects.length === 0 && <p style={{textAlign: 'center', color: 'var(--subtle-text-color)'}}>No projects yet. Add one to start tracking!</p>}
+            {/* Proje Listesi (Tailwind ile) */}
+            <div className="space-y-6">
+              {sortedProjects.map(project => (
+                  <ProjectCard key={project.id} project={project} setProjects={setProjects} />
+              ))}
+            </div>
+            {sortedProjects.length === 0 && <p className="text-center text-gray-500 dark:text-gray-400 mt-8">No projects yet. Add one to start tracking!</p>}
         </div>
     );
 };
 
 // --- ProjectCard Bileşeni ---
+// (Bütün manuel CSS'leri Tailwind sınıflarıyla değiştirdim)
+// DÜZELTME: 'any' tiplerini kaldırıyoruz
 interface ProjectCardProps {
     project: Project;
     setProjects: React.Dispatch<React.SetStateAction<Project[]>>;
@@ -426,6 +271,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     const deleteProject = () => { if (window.confirm('Are you sure you want to delete this project?')) { setProjects(prevProjects => prevProjects.filter(p => p.id !== project.id)); } };
     const deleteTask = (taskId: number) => { if (window.confirm('Are you sure?')) { updateProject({ tasks: project.tasks.filter(t => t.id !== taskId) }); } };
     
+    // DÜZELTME: 'any' tiplerini kaldırıyoruz
     const handleTaskInputChange = (field: keyof typeof newTaskInputs, value: string) => setNewTaskInputs(prev => ({...prev, [field]: value }));
     const handleDetailChange = (field: keyof ProjectDetails, value: string) => updateProject({ details: { ...(project.details || { notes: '', website: '', twitter: '' }), [field]: value } });
 
@@ -465,7 +311,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(date.getTime() + userTimezoneOffset);
             if (isNaN(correctedDate.getTime())) return ''; 
             return correctedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-        // === DÜZELTME: Hata değişkeni tamamen kaldırıldı ===
         } catch { 
             return ''; 
         } 
@@ -479,9 +324,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             const correctedDate = new Date(dueDate.getTime() + userTimezoneOffset); 
             if (isNaN(correctedDate.getTime())) return '';
             correctedDate.setHours(0,0,0,0);
-            if (correctedDate < today) return 'overdue';
-            if (correctedDate.getTime() === today.getTime()) return 'today';
-        // === DÜZELTME: Hata değişkeni tamamen kaldırıldı ===
+            if (correctedDate < today) return 'text-red-600 dark:text-red-400 font-medium'; // overdue
+            if (correctedDate.getTime() === today.getTime()) return 'text-blue-600 dark:text-blue-400 font-medium'; // today
         } catch { 
             return '';
         }
@@ -492,31 +336,72 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     const completedTasks = project.tasks.filter(t => t.completed);
     const progress = project.tasks.length > 0 ? Math.round((completedTasks.length / project.tasks.length) * 100) : 0;
     
+    // Tailwind Sınıfları
+    const priorityClasses = {
+      low: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300',
+      medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300',
+      high: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300',
+    }
     const PriorityTag = ({priority}: {priority: Task['priority']}) => (
-      <span className={`priority-tag ${priority}`}>
+      <span className={`px-2 py-0.5 rounded-full text-xs font-semibold uppercase ${priorityClasses[priority] || priorityClasses['medium']}`}>
         {priority}
       </span>
     );
 
+    // Task (Görev) Bileşeni (Tailwind ile)
     const TaskItem = ({ task }: {task: Task}) => {
         const isEditing = editingTaskId === task.id;
         return (
-            <li className="task-item">
+            <li className="flex items-center gap-3 p-3 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg transition group">
                 {isEditing ? (
-                    <form className="edit-task-form" onSubmit={(e) => { e.preventDefault(); saveEdit(task.id); }}>
-                        <input type="text" value={editingText} onChange={(e) => setEditingText(e.target.value)} autoFocus onBlur={() => saveEdit(task.id)} onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}/>
+                    <form className="flex-grow" onSubmit={(e) => { e.preventDefault(); saveEdit(task.id); }}>
+                        <input 
+                          type="text" 
+                          value={editingText} 
+                          onChange={(e) => setEditingText(e.target.value)} 
+                          autoFocus 
+                          onBlur={() => saveEdit(task.id)} 
+                          onKeyDown={(e) => e.key === 'Escape' && cancelEdit()}
+                          className="w-full p-1 border border-blue-500 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none"
+                        />
                     </form>
                 ) : (
                     <>
-                        <div className="task-item-main">
-                            <input type="checkbox" id={`task-${task.id}`} checked={task.completed} onChange={() => toggleTask(task.id)} />
-                            <label htmlFor={`task-${task.id}`} className={task.completed ? 'completed' : ''}> {task.text} </label>
+                        <div className="flex-grow flex items-center gap-3 cursor-pointer" onClick={() => toggleTask(task.id)}>
+                            <input 
+                              type="checkbox" 
+                              id={`task-${task.id}`} 
+                              checked={task.completed} 
+                              readOnly 
+                              className="w-5 h-5 text-blue-600 bg-gray-100 border-gray-300 rounded focus:ring-blue-500 dark:focus:ring-blue-600 dark:ring-offset-gray-800 focus:ring-2 dark:bg-gray-700 dark:border-gray-600"
+                            />
+                            <label htmlFor={`task-${task.id}`} className={`flex-grow ${task.completed ? 'line-through text-gray-500 dark:text-gray-400' : 'text-gray-900 dark:text-gray-100'}`}> 
+                              {task.text} 
+                            </label>
                         </div>
-                        <div className="task-item-actions">
+                        
+                        {/* Task'ın sağ tarafındaki butonlar (Tailwind ile) */}
+                        <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
                             <PriorityTag priority={task.priority} />
-                            {task.dueDate && <span className={`task-due-date ${getDueDateClass(task)}`}> {formatDate(task.dueDate)} </span>}
-                            <button className="action-button edit" onClick={() => handleEdit(task)} aria-label="Edit Task"><Edit2 size={16} /></button>
-                             <button className="action-button delete" onClick={() => deleteTask(task.id)} aria-label="Delete Task"><Trash2 size={16} /></button>
+                            {task.dueDate && (
+                              <span className={`text-sm text-gray-500 dark:text-gray-400 ${getDueDateClass(task)}`}> 
+                                {formatDate(task.dueDate)} 
+                              </span>
+                            )}
+                            <button 
+                              className="p-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" 
+                              onClick={() => handleEdit(task)} 
+                              aria-label="Edit Task"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                             <button 
+                               className="p-1 text-gray-500 hover:text-red-600 dark:hover:text-red-400" 
+                               onClick={() => deleteTask(task.id)} 
+                               aria-label="Delete Task"
+                             >
+                               <Trash2 size={16} />
+                             </button>
                         </div>
                     </>
                 )}
@@ -525,112 +410,158 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     };
 
     return (
-         <div className="project-card">
-            <div className="project-card-main">
-                <div className="project-header">
-                   <div className="project-header-title">
+         // Proje Kartı (Tailwind ile)
+         <div className="bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl overflow-hidden shadow-sm">
+            {/* Kartın Ana İçeriği */}
+            <div className="p-6">
+                <div className="flex justify-between items-center mb-4">
+                   <div className="flex items-center gap-2">
                         {isEditingName ? (
-                            <input type="text" value={projectName} onChange={(e) => setProjectName(e.target.value)} onBlur={saveProjectName} onKeyDown={handleProjectNameKeyDown} autoFocus />
+                            <input 
+                              type="text" 
+                              value={projectName} 
+                              onChange={(e) => setProjectName(e.target.value)} 
+                              onBlur={saveProjectName} 
+                              onKeyDown={handleProjectNameKeyDown} 
+                              autoFocus 
+                              className="text-xl font-semibold p-1 border border-blue-500 rounded bg-white dark:bg-gray-600 text-gray-900 dark:text-gray-100 focus:outline-none"
+                            />
                         ) : (
                             <>
-                                <h2>{project.name}</h2>
-                                <button className="action-button edit" onClick={() => setIsEditingName(true)} aria-label="Edit Project Name"><Edit2 size={16} /></button>
+                                <h2 className="text-xl font-semibold text-gray-900 dark:text-white">{project.name}</h2>
+                                <button 
+                                  className="p-1 text-gray-500 hover:text-blue-600 dark:hover:text-blue-400" 
+                                  onClick={() => setIsEditingName(true)} 
+                                  aria-label="Edit Project Name"
+                                >
+                                  <Edit2 size={16} />
+                                </button>
                             </>
                         )}
                     </div>
-                    <button className="action-button delete" onClick={deleteProject} aria-label="Delete Project"><Trash2 size={20} /></button>
+                    <button 
+                      className="p-1 text-gray-500 hover:text-red-600 dark:hover:text-red-400" 
+                      onClick={deleteProject} 
+                      aria-label="Delete Project"
+                    >
+                      <Trash2 size={20} />
+                    </button>
                 </div>
+                
+                {/* Progress Bar (Tailwind ile) */}
                 {project.tasks.length > 0 && (
-                     <div className="progress-info">
-                        <div className="progress-text">{completedTasks.length} of {project.tasks.length} tasks completed</div>
-                        <div className="progress-bar-container"><div className="progress-bar" style={{width: `${progress}%`}}></div></div>
+                     <div className="mb-4">
+                        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+                          <span>Progress</span>
+                          <span>{progress}%</span>
+                        </div>
+                        <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+                          <div 
+                            className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                            style={{width: `${progress}%`}}
+                          ></div>
+                        </div>
                     </div>
                 )}
-                <ul className="task-list">
+                
+                {/* Task Listesi (Tailwind ile) */}
+                <ul className="space-y-1 mb-4">
                     {incompleteTasks.map(task => (<TaskItem key={task.id} task={task} />))}
                 </ul>
-                <form className="task-form" onSubmit={addTask}>
-                    <input type="text" placeholder="Add new task (e.g., Swap...)" value={newTaskInputs.text} onChange={(e) => handleTaskInputChange('text', e.target.value)} />
-                    <input type="date" value={newTaskInputs.dueDate} onChange={(e) => handleTaskInputChange('dueDate', e.target.value)} />
-                    <select value={newTaskInputs.priority} onChange={(e) => handleTaskInputChange('priority', e.target.value as Task['priority'])}>
+                
+                {/* Task Ekleme Formu (Tailwind ile) */}
+                <form className="flex gap-2 flex-wrap" onSubmit={addTask}>
+                    <input 
+                      type="text" 
+                      placeholder="Add new task..." 
+                      value={newTaskInputs.text} 
+                      onChange={(e) => handleTaskInputChange('text', e.target.value)} 
+                      className="flex-grow p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <input 
+                      type="date" 
+                      value={newTaskInputs.dueDate} 
+                      onChange={(e) => handleTaskInputChange('dueDate', e.target.value)} 
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    />
+                    <select 
+                      value={newTaskInputs.priority} 
+                      onChange={(e) => handleTaskInputChange('priority', e.target.value as Task['priority'])}
+                      className="p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                    >
                         <option value="low">Low</option>
                         <option value="medium">Medium</option>
                         <option value="high">High</option>
                     </select>
-                    <button type="submit"><Plus size={14} strokeWidth={3} /> Add</button>
+                    <button 
+                      type="submit"
+                      className="px-4 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition flex items-center gap-1.5"
+                    >
+                      <Plus size={14} strokeWidth={3} /> Add
+                    </button>
                 </form>
+                 
+                 {/* Tamamlanan Görevler (Tailwind ile) */}
                  {completedTasks.length > 0 && (
-                     <>
-                        <button className={`completed-section-toggle ${completedVisible ? 'open' : ''}`} onClick={() => setCompletedVisible(prev => !prev)}>
-                            <ChevronRight size={16} /> {completedTasks.length} Completed Tasks
+                     <div className="mt-6">
+                        <button 
+                          className={`flex items-center gap-1 text-sm font-medium text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 transition ${completedVisible ? 'mb-2' : ''}`} 
+                          onClick={() => setCompletedVisible(prev => !prev)}
+                        >
+                            <ChevronRight size={16} className={`transition-transform ${completedVisible ? 'rotate-90' : ''}`} /> 
+                            {completedTasks.length} Completed Tasks
                         </button>
-                        <div className={`completed-list ${completedVisible ? 'open' : ''}`}>
-                            <ul className="task-list">
+                        <div className={`overflow-hidden transition-all duration-300 ${completedVisible ? 'max-h-screen' : 'max-h-0'}`}>
+                            <ul className="space-y-1 border-t border-gray-200 dark:border-gray-700 pt-2">
                                 {completedTasks.map(task => (<TaskItem key={task.id} task={task} />))}
                             </ul>
                         </div>
-                    </>
+                    </div>
                  )}
             </div>
-            {/* Details (Notlar, Website, Twitter) Bölümü */}
-             <button className={`details-toggle ${detailsVisible ? 'open' : ''}`} onClick={() => setDetailsVisible(prev => !prev)}>
-                 <ChevronRight size={16} /> Details
+            
+            {/* Details (Notlar, Website, Twitter) Bölümü (Tailwind ile) */}
+             <button 
+               className={`w-full flex items-center gap-1 p-4 text-sm font-medium text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition border-t border-gray-200 dark:border-gray-700 ${detailsVisible ? 'bg-gray-100 dark:bg-gray-700' : ''}`} 
+               onClick={() => setDetailsVisible(prev => !prev)}
+             >
+                 <ChevronRight size={16} className={`transition-transform ${detailsVisible ? 'rotate-90' : ''}`} /> 
+                 Details
              </button>
-             <div className={`project-details ${detailsVisible ? 'open' : ''}`}>
-                 <div className="details-grid">
+             <div className={`overflow-hidden transition-all duration-300 ${detailsVisible ? 'max-h-screen' : 'max-h-0'}`}>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 border-t border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
                     <div>
-                        <label>Website</label>
-                        <input type="text" placeholder="https://project.com" value={project.details?.website || ''} onChange={(e) => handleDetailChange('website', e.target.value)} />
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Website</label>
+                        <input 
+                          type="text" 
+                          placeholder="https://project.com" 
+                          value={project.details?.website || ''} 
+                          onChange={(e) => handleDetailChange('website', e.target.value)} 
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
                     </div>
                     <div>
-                        <label>Twitter</label>
-                        <input type="text" placeholder="https://twitter.com/project" value={project.details?.twitter || ''} onChange={(e) => handleDetailChange('twitter', e.target.value)} />
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Twitter</label>
+                        <input 
+                          type="text" 
+                          placeholder="https://twitter.com/project" 
+                          value={project.details?.twitter || ''} 
+                          onChange={(e) => handleDetailChange('twitter', e.target.value)} 
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                        />
                     </div>
-                    <div style={{gridColumn: '1 / -1'}}>
-                        <label>Notes</label>
-                        <textarea placeholder="Your strategy, thoughts, next steps..." value={project.details?.notes || ''} onChange={(e) => handleDetailChange('notes', e.target.value)}></textarea>
+                    <div className="md:col-span-2">
+                        <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">Notes</label>
+                        <textarea 
+                          placeholder="Your strategy, thoughts, next steps..." 
+                          value={project.details?.notes || ''} 
+                          onChange={(e) => handleDetailChange('notes', e.target.value)}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-1 focus:ring-blue-500 min-h-[80px]"
+                        ></textarea>
                     </div>
                  </div>
              </div>
         </div>
     );
 };
-
-
-// === Cüzdan Bağlama Popup (Modal) Bileşeni ===
-interface ConnectModalProps {
-    onClose: () => void;
-    onConnect: (walletType: 'metamask' | 'coinbase') => void;
-    onFarcasterConnect: () => void;
-}
-const ConnectModal: React.FC<ConnectModalProps> = ({ onClose, onConnect, onFarcasterConnect }) => (
-    <div className="modal-backdrop">
-        <div className="modal-content">
-            <button className="modal-close" onClick={onClose}>&times;</button>
-            <h2>Connect Wallet</h2>
-            <div className="wallet-options">
-                 
-                 <button className="wallet-button" onClick={() => onConnect('metamask')}>
-                    {/* İkonlar Silindi */}
-                    <span>MetaMask</span>
-                </button>
-                 
-                 <button className="wallet-button" onClick={() => onConnect('coinbase')}>
-                    {/* İkonlar Silindi */}
-                    <span>Coinbase Wallet</span>
-                </button>
-                
-                <button className="wallet-button" onClick={() => alert('Rabby Wallet support coming soon!')}>
-                     {/* İkonlar Silindi */}
-                    <span>Rabby Wallet</span>
-                </button>
-                
-                <button className="wallet-button" onClick={onFarcasterConnect}>
-                    {/* İkonlar Silindi */}
-                    <span>Sign in with Farcaster</span>
-                </button>
-            </div>
-        </div>
-    </div>
-);
 
