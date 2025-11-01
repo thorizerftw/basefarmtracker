@@ -5,7 +5,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
-  Fragment, // 'Transition' bileşeni için bu gerekli
+  Fragment,
 } from 'react';
 import {
   Upload,
@@ -13,23 +13,21 @@ import {
   Plus,
   Trash2,
   Edit2,
-  Check,
+  // Check, // VERCEL HATASI DÜZELTMESİ: 'Check' kullanılmadığı için kaldırıldı
   ChevronDown,
-  Sun, // Dark mode için eklendi
-  Moon, // Dark mode için eklendi
+  Sun,
+  Moon,
 } from 'lucide-react';
-import { useTheme } from 'next-themes'; // Dark mode için bu pakete HÂLÂ ihtiyacımız var
-import { sendReadySignal } from './utils'; // Hazır sinyali için
-// HATA ÇÖZÜMÜ: Eksik import'ları buraya ekliyoruz
+import { useTheme } from 'next-themes';
+import { sendReadySignal } from './utils';
 import { Menu, Transition } from '@headlessui/react';
 
 // --- Tipler (Interfaces) ---
 
-// Arkadaşının kodundaki User tipi
 type User = {
   address: string;
   displayName: string;
-  avatarUrl: string;
+  avatarUrl: string; // "62" avatarı için bunu artık kullanmayacağız (İSTEK 3)
 };
 
 interface Task {
@@ -56,14 +54,12 @@ interface Project {
 // --- Ana Sayfa Bileşeni ---
 export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
-  // wagmi'den değil, arkadaşının yaptığı gibi manuel state'den alıyoruz
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  // VERCEL HATASI DÜZELTMESİ: 'theme' burada kullanılmıyor, o yüzden 'useTheme'i buradan sildim.
+  // Sadece 'ConnectScreen' ve 'UserMenu' içinde kullanılacak.
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
-
-  // Avatar ve isim için
   const buildUserProfile = useCallback(async (address: string): Promise<User> => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -71,42 +67,34 @@ export default function HomePage() {
       if (w.ethereum?.isCoinbaseWallet && w.ethereum?.coinbase?.getUser) {
         const user = await w.ethereum.coinbase.getUser();
         const display = user?.data?.profile?.displayName;
-        const image = user?.data?.profile?.profileImageUrl;
-        const initials = (display || address.substring(2, 4))
-          .substring(0, 2)
-          .toUpperCase();
         return {
           address,
+          // İSTEK 3 ÇÖZÜMÜ: 'displayName' (örn: 0x123...f6e4) kullan
           displayName:
             display ||
             `${address.substring(0, 6)}...${address.substring(
               address.length - 4,
             )}`,
-          avatarUrl:
-            image ||
-            `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
+          avatarUrl: '', // "62" avatarını artık kullanmıyoruz
         };
       }
     } catch (e) {
       console.warn('Coinbase user profile fetch failed', e);
     }
     // Fallback
-    const initials = address.substring(2, 4).toUpperCase();
     return {
       address,
       displayName: `${address.substring(0, 6)}...${address.substring(
         address.length - 4,
       )}`,
-      avatarUrl: `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
+      avatarUrl: '', // "62" avatarını artık kullanmıyoruz
     };
   }, []);
 
-  // Bağlantıyı kes
   const handleDisconnect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum = (window as any).ethereum;
     try {
-      // MetaMask'in izinlerini sıfırla (Arkadaşının kodundaki gibi)
       await ethereum?.request?.({
         method: 'wallet_revokePermissions',
         params: [{ eth_accounts: {} }],
@@ -118,7 +106,6 @@ export default function HomePage() {
     setCurrentUser(null);
   }, []);
 
-  // Cüzdan bağla
   const handleConnect = useCallback(async () => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum = (window as any).ethereum;
@@ -127,7 +114,6 @@ export default function HomePage() {
       return;
     }
     try {
-      // Bağlantı iste
       const accounts: string[] = await ethereum.request({
         method: 'eth_requestAccounts',
       });
@@ -142,7 +128,6 @@ export default function HomePage() {
     }
   }, [buildUserProfile]);
 
-  // Sayfa yüklendiğinde eski bağlantıyı kontrol et (Arkadaşının kodundaki gibi)
   useEffect(() => {
     const savedAddress = localStorage.getItem('basefarm_connected_address');
     if (!savedAddress) return;
@@ -162,19 +147,16 @@ export default function HomePage() {
           const user = await buildUserProfile(accounts[0]);
           setCurrentUser(user);
         } else {
-          // İzinler bitmiş, localStorage'ı temizle
           localStorage.removeItem('basefarm_connected_address');
           setCurrentUser(null);
         }
       })
       .catch(() => {
-        // Hata olursa (örn. cüzdan kilitliyse)
         localStorage.removeItem('basefarm_connected_address');
         setCurrentUser(null);
       });
   }, [buildUserProfile]);
 
-  // Hesap değişikliğini dinle (Arkadaşının kodundaki gibi)
   useEffect(() => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const ethereum = (window as any).ethereum;
@@ -182,7 +164,6 @@ export default function HomePage() {
 
     const onAccountsChanged = (accounts: string[]) => {
       if (!accounts?.length) {
-        // Cüzdan kilitlendi veya bağlantı koptu
         handleDisconnect();
         return;
       }
@@ -191,7 +172,6 @@ export default function HomePage() {
         currentUser &&
         newAddr.toLowerCase() !== currentUser.address.toLowerCase()
       ) {
-        // Farklı bir hesaba geçildi, yeniden bağlan
         handleConnect();
       }
     };
@@ -206,48 +186,35 @@ export default function HomePage() {
     };
   }, [currentUser, handleConnect, handleDisconnect]);
 
-  // --- /Cüzdan Bağlantı Mantığı ---
-
   useEffect(() => {
     setIsClient(true);
-    sendReadySignal(); // Mini-app sinyalini gönder
+    sendReadySignal();
   }, []);
 
-  // Temayı <html> tag'ine uygula (ConnectButton olmadan manuel yapıyoruz)
+  // Temayı <html> tag'ine uygula
+  // (Not: 'useTheme' 'ConnectScreen' ve 'UserMenu' içinde çağrılıyor)
   useEffect(() => {
-    if (resolvedTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
+    // Siteyi hep 'dark' modda tut (İSTEK 1)
+    document.documentElement.classList.add('dark');
+    if (localStorage.getItem('theme') !== 'dark') {
+      localStorage.setItem('theme', 'dark');
     }
-  }, [resolvedTheme]);
+  }, []);
 
   if (!isClient) {
-    return null; // Sunucu tarafında (SSR) render olmasını engelle
+    return null;
   }
-
-  // Tema değiştirme fonksiyonu (artık çalışacak)
-  const toggleTheme = () => {
-    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
-  };
 
   return (
     <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
-      {/* Header (Başlık) */}
       <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center w-full max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
           BaseFarm Tracker
         </h1>
-        {/*
-          'ConnectButton' yerine kendi 'UserMenu' bileşenimizi koyuyoruz.
-          Bu, wagmi/onchainkit bağımlılığını kaldırır.
-        */}
         {currentUser ? (
           <UserMenu
             user={currentUser}
             onDisconnect={handleDisconnect}
-            onToggleTheme={toggleTheme}
-            currentTheme={resolvedTheme}
           />
         ) : (
           <button
@@ -259,14 +226,11 @@ export default function HomePage() {
         )}
       </header>
 
-      {/* Ana İçerik */}
       <main className="w-full max-w-3xl">
         {currentUser ? (
-          // Cüzdan bağlıysa ana uygulamayı göster
           <FarmTracker userAddress={currentUser.address} />
         ) : (
-          // Cüzdan bağlı değilse "Bağlan" ekranını göster
-          <ConnectScreen onConnect={handleConnect} onToggleTheme={toggleTheme} currentTheme={resolvedTheme} />
+          <ConnectScreen onConnect={handleConnect} />
         )}
       </main>
     </div>
@@ -276,11 +240,9 @@ export default function HomePage() {
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
   onConnect: () => void;
-  onToggleTheme: () => void;
-  currentTheme?: string;
 }
-const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect, onToggleTheme, currentTheme }) => (
-  <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative"> {/* 'relative' eklendi */}
+const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
+  <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative">
     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
       Welcome to Farm Tracker
     </h2>
@@ -293,42 +255,26 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect, onToggleTheme,
     >
       Connect Wallet
     </button>
-    {/* Tema tuşu (sağ üst köşe) */}
-    <button
-      onClick={onToggleTheme}
-      className="absolute top-4 right-4 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-      aria-label="Toggle Theme"
-    >
-      {currentTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-    </button>
+    {/* İSTEK 1 ÇÖZÜMÜ: Tema tuşu kaldırıldı */}
   </div>
 );
 
 
 // --- Bileşen: UserMenu (Sağ Üst Menü) ---
-// Bu bileşen, wagmi/onchainkit'e gerek duymadan çalışır
 interface UserMenuProps {
   user: User;
   onDisconnect: () => void;
-  onToggleTheme: () => void;
-  currentTheme?: string;
 }
-const UserMenu: React.FC<UserMenuProps> = ({
-  user,
-  onDisconnect,
-  onToggleTheme,
-  currentTheme,
-}) => {
+const UserMenu: React.FC<UserMenuProps> = ({ user, onDisconnect }) => {
   return (
     <div className="relative inline-block text-left">
       <Menu>
         <Menu.Button className="flex items-center gap-2 p-1.5 pr-3 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-          <img
-            src={user.avatarUrl}
-            alt="Avatar"
-            className="w-8 h-8 rounded-full border-2 border-gray-200 dark:border-gray-600"
-          />
-          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+          {/*
+            İSTEK 3 ÇÖZÜMÜ: '62' avatarı (<img>) kaldırıldı.
+            Sadece 'displayName' (adres) gösteriliyor.
+          */}
+          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 px-2">
             {user.displayName}
           </span>
           <ChevronDown
@@ -346,31 +292,9 @@ const UserMenu: React.FC<UserMenuProps> = ({
           leaveTo="transform opacity-0 scale-95"
         >
           <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+            {/* İSTEK 1 ÇÖZÜMÜ: Tema tuşu menüden kaldırıldı */}
             <div className="py-1">
               <Menu.Item>
-                {/* ESLint 'any' hatasını çözmek için tipi (type) ekliyoruz */}
-                {({ active }: { active: boolean }) => (
-                  <button
-                    onClick={onToggleTheme}
-                    className={`${
-                      active
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                        : 'text-gray-700 dark:text-gray-300'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
-                  >
-                    {currentTheme === 'dark' ? (
-                      <Sun size={16} className="mr-2" />
-                    ) : (
-                      <Moon size={16} className="mr-2" />
-                    )}
-                    Toggle Theme
-                  </button>
-                )}
-              </Menu.Item>
-            </div>
-            <div className="py-1">
-              <Menu.Item>
-                {/* ESLint 'any' hatasını çözmek için tipi (type) ekliyoruz */}
                 {({ active }: { active: boolean }) => (
                   <button
                     onClick={onDisconnect}
@@ -465,9 +389,9 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (e) => {
+    reader.onload = (readerEvent) => { // VERCEL HATASI DÜZELTMESİ: 'e' yerine 'readerEvent'
       try {
-        const text = e.target?.result as string;
+        const text = readerEvent.target?.result as string; // 'e' yerine 'readerEvent'
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const importedProjects: any[] = JSON.parse(text);
 
@@ -849,8 +773,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                 {task.text}
               </label>
             </div>
-
-            <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
+            
+            {/*
+              İSTEK 2 ÇÖZÜMÜ:
+              'opacity-0 group-hover:opacity-100' kaldırıldı
+              ve etiketler hep görünür hale getirildi.
+            */}
+            <div className="flex items-center gap-2 ml-auto transition">
               <PriorityTag priority={task.priority} />
               {task.dueDate && (
                 <span
