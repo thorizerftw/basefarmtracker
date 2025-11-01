@@ -48,13 +48,9 @@ interface Project {
   details: ProjectDetails;
 }
 
-// --- Ana Sayfa Bileşeni ---
-export default function HomePage() {
-  const [isClient, setIsClient] = useState(false);
-  
-  // --- "Not Ready" KİLİDİ ---
-  const [isAppReady, setIsAppReady] = useState(false);
-
+// --- ÇÖZÜM ADIM 1: TÜM UYGULAMA MANTIĞINI BU YENİ BİLEŞENE TAŞIDIK ---
+// Bu bileşen, SADECE "isAppReady" true olduktan sonra render edilecek.
+function FarmTrackerApp() {
   // --- YENİ WAGMI CÜZDAN YÖNETİMİ ---
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { address, isConnected } = useAccount(); // Wagmi'den bağlantı durumunu al
@@ -99,19 +95,78 @@ export default function HomePage() {
   }, []);
 
   // --- WAGMI'NİN DURUMUNA GÖRE KULLANICIYI GÜNCELLE ---
-  // VERCEL'İN UYARDIĞI YER BURASIYDI, "isAppReady" EKLEDİK
   useEffect(() => {
-    // "Not Ready" kilidi: Uygulama hazır olmadan cüzdanı kontrol etme
-    if (isAppReady && isConnected && address) {
+    // Bu bileşen zaten "Ready" olduktan sonra çalıştığı için
+    // "isAppReady" kilidine burada artık gerek yok.
+    if (isConnected && address) {
       buildUserProfile(address).then(setCurrentUser);
-      // Wagmi cüzdanını localStorage'a kaydet (sayfa yenileme için)
       localStorage.setItem('basefarm_connected_address', address);
     } else if (!isConnected) {
       setCurrentUser(null);
       localStorage.removeItem('basefarm_connected_address');
     }
-  }, [isConnected, address, isAppReady, buildUserProfile]); // "isAppReady" dependency'si burada
+  }, [isConnected, address, buildUserProfile]);
 
+  // Temayı <html> tag'ine uygula
+  useEffect(() => {
+    document.documentElement.classList.add('dark');
+  }, []);
+
+  // --- MODAL İÇİN CÜZDANLARI LİSTELE ---
+  // Artık "No wallet connector found" hatası almayacağız
+  const walletButtons = connectors
+    .filter((c) => c.ready)
+    .map((connector) => (
+      <button
+        key={connector.id}
+        onClick={() => connect({ connector })}
+        className="mt-6 w-full px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+      >
+        {connector.name}
+      </button>
+    ));
+
+  return (
+    <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
+      {/* Header (Başlık) */}
+      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center w-full max-w-5xl mx-auto">
+        <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+          BaseFarm Tracker
+        </h1>
+        {currentUser ? (
+          <UserMenu
+            user={currentUser}
+            onDisconnect={() => disconnect()}
+          />
+        ) : (
+          connectors[0] && (
+            <button
+              onClick={() => connect({ connector: connectors[0] })}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Connect Wallet
+            </button>
+          )
+        )}
+      </header>
+
+      {/* Ana İçerik */}
+      <main className="w-full max-w-3xl">
+        {currentUser ? (
+          <FarmTracker userAddress={currentUser.address} />
+        ) : (
+          <ConnectScreen walletButtons={walletButtons} />
+        )}
+      </main>
+    </div>
+  );
+}
+
+
+// --- ÇÖZÜM ADIM 2: ANA SAYFA BİLEŞENİ (PAGE) ARTIK SADECE "READY" SİNYALİ VERİYOR ---
+export default function Page() {
+  const [isClient, setIsClient] = useState(false);
+  const [isAppReady, setIsAppReady] = useState(false);
 
   // --- "NOT READY" SİNYALİNİ YOLLA VE KİLİDİ AÇ ---
   useEffect(() => {
@@ -155,65 +210,27 @@ export default function HomePage() {
     }, 500);
 
     return () => clearInterval(id);
-  }, []); // Boş dependency array'i [ ] kalmalı
-
-  // Temayı <html> tag'ine uygula
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
   }, []);
 
   if (!isClient) {
-    return null;
+    return null; // SSR'da hiçbir şey gösterme
   }
 
-  // --- MODAL İÇİN CÜZDANLARI LİSTELE ---
-  const walletButtons = connectors
-    .filter((c) => c.ready) 
-    .map((connector) => (
-      <button
-        key={connector.id}
-        onClick={() => connect({ connector })} 
-        className="mt-6 w-full px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-      >
-        {connector.name}
-      </button>
-    ));
-
+  // Kilit açılana kadar (isAppReady=true) cüzdan kancaları (hook) çağrılmaz
   return (
-    <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
-      {/* Header (Başlık) */}
-      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center w-full max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-          BaseFarm Tracker
-        </h1>
-        {currentUser ? (
-          <UserMenu
-            user={currentUser}
-            onDisconnect={() => disconnect()} 
-          />
-        ) : (
-          connectors[0] && (
-            <button
-              onClick={() => connect({ connector: connectors[0] })}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
-              Connect Wallet
-            </button>
-          )
-        )}
-      </header>
-
-      {/* Ana İçerik */}
-      <main className="w-full max-w-3xl">
-        {currentUser ? (
-          <FarmTracker userAddress={currentUser.address} />
-        ) : (
-          <ConnectScreen walletButtons={walletButtons} />
-        )}
-      </main>
-    </div>
+    <>
+      {isAppReady ? (
+        <FarmTrackerApp />
+      ) : (
+        // Sayfa yüklenirken "Not Ready" demesin diye basit bir yükleme ekranı
+        <div className="flex justify-center items-center min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
+          <p className="text-gray-900 dark:text-gray-100">Loading Base Tracker...</p>
+        </div>
+      )}
+    </>
   );
 }
+
 
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
@@ -231,6 +248,7 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ walletButtons }) => (
       {walletButtons.length > 0 ? (
         walletButtons
       ) : (
+        // Bu hata artık görünmemeli
         <p className="text-red-500">
           No wallet connector found. Please install MetaMask or Coinbase Wallet.
         </p>
@@ -894,7 +912,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                   completedVisible ? 'rotate-0' : '-rotate-90'
                 }`}
               />
-              {/* --- ÇÖZÜM 1: 'İkon' YAZAN YERDEKİ SYNTAX HATASINI DÜZELTTİM --- */}
               {completedTasks.length} Completed Tasks
             </button>
             <div
@@ -960,6 +977,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
               Notes
             </label>
+            {/* --- BENİM YAZIM HATAMDI, DÜZELTTİM --- */}
             <textarea
               placeholder="Your strategy, thoughts, next steps..."
               value={project.details?.notes || ''}
