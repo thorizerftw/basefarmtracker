@@ -15,10 +15,10 @@ import {
   Edit2,
   // Check, // VERCEL HATASI DÜZELTMESİ: 'Check' kullanılmadığı için kaldırıldı
   ChevronDown,
-  Sun,
-  Moon,
+  // Sun, // VERCEL HATASI DÜZELTMESİ: 'Sun' kullanılmadığı için kaldırıldı
+  // Moon, // VERCEL HATASI DÜZELTMESİ: 'Moon' kullanılmadığı için kaldırıldı
 } from 'lucide-react';
-import { useTheme } from 'next-themes';
+// import { useTheme } from 'next-themes'; // VERCEL HATASI DÜZELTMESİ: 'useTheme' kullanılmadığı için kaldırıldı
 import { sendReadySignal } from './utils';
 import { Menu, Transition } from '@headlessui/react';
 
@@ -27,7 +27,7 @@ import { Menu, Transition } from '@headlessui/react';
 type User = {
   address: string;
   displayName: string;
-  avatarUrl: string; // "62" avatarı için bunu artık kullanmayacağız (İSTEK 3)
+  avatarUrl: string;
 };
 
 interface Task {
@@ -56,10 +56,11 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // VERCEL HATASI DÜZELTMESİ: 'theme' burada kullanılmıyor, o yüzden 'useTheme'i buradan sildim.
-  // Sadece 'ConnectScreen' ve 'UserMenu' içinde kullanılacak.
+  // 'useTheme' import'u kaldırıldığı için bu satır da kaldırıldı.
+  // const { theme, setTheme, resolvedTheme } = useTheme();
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
+
   const buildUserProfile = useCallback(async (address: string): Promise<User> => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -67,27 +68,32 @@ export default function HomePage() {
       if (w.ethereum?.isCoinbaseWallet && w.ethereum?.coinbase?.getUser) {
         const user = await w.ethereum.coinbase.getUser();
         const display = user?.data?.profile?.displayName;
+        const image = user?.data?.profile?.profileImageUrl;
+        const initials = (display || address.substring(2, 4))
+          .substring(0, 2)
+          .toUpperCase();
         return {
           address,
-          // İSTEK 3 ÇÖZÜMÜ: 'displayName' (örn: 0x123...f6e4) kullan
           displayName:
             display ||
             `${address.substring(0, 6)}...${address.substring(
               address.length - 4,
             )}`,
-          avatarUrl: '', // "62" avatarını artık kullanmıyoruz
+          avatarUrl:
+            image ||
+            `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
         };
       }
     } catch (e) {
       console.warn('Coinbase user profile fetch failed', e);
     }
-    // Fallback
+    const initials = address.substring(2, 4).toUpperCase();
     return {
       address,
       displayName: `${address.substring(0, 6)}...${address.substring(
         address.length - 4,
       )}`,
-      avatarUrl: '', // "62" avatarını artık kullanmıyoruz
+      avatarUrl: `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
     };
   }, []);
 
@@ -186,27 +192,28 @@ export default function HomePage() {
     };
   }, [currentUser, handleConnect, handleDisconnect]);
 
+  // --- /Cüzdan Bağlantı Mantığı ---
+
   useEffect(() => {
     setIsClient(true);
     sendReadySignal();
   }, []);
 
   // Temayı <html> tag'ine uygula
-  // (Not: 'useTheme' 'ConnectScreen' ve 'UserMenu' içinde çağrılıyor)
   useEffect(() => {
-    // Siteyi hep 'dark' modda tut (İSTEK 1)
+    // 'useTheme' kaldırıldığı için, varsayılan olarak 'dark' modu zorluyoruz
     document.documentElement.classList.add('dark');
-    if (localStorage.getItem('theme') !== 'dark') {
-      localStorage.setItem('theme', 'dark');
-    }
   }, []);
 
   if (!isClient) {
     return null;
   }
 
+  // 'useTheme' kaldırıldığı için 'toggleTheme' fonksiyonu da kaldırıldı
+
   return (
     <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
+      {/* Header (Başlık) */}
       <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center w-full max-w-5xl mx-auto">
         <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
           BaseFarm Tracker
@@ -215,6 +222,7 @@ export default function HomePage() {
           <UserMenu
             user={currentUser}
             onDisconnect={handleDisconnect}
+            // onToggleTheme prop'u kaldırıldı
           />
         ) : (
           <button
@@ -226,6 +234,7 @@ export default function HomePage() {
         )}
       </header>
 
+      {/* Ana İçerik */}
       <main className="w-full max-w-3xl">
         {currentUser ? (
           <FarmTracker userAddress={currentUser.address} />
@@ -240,6 +249,7 @@ export default function HomePage() {
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
   onConnect: () => void;
+  // onToggleTheme prop'ları kaldırıldı
 }
 const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
   <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative">
@@ -255,7 +265,7 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
     >
       Connect Wallet
     </button>
-    {/* İSTEK 1 ÇÖZÜMÜ: Tema tuşu kaldırıldı */}
+    {/* Tema tuşu (sağ üst köşe) kaldırıldı */}
   </div>
 );
 
@@ -264,17 +274,22 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
 interface UserMenuProps {
   user: User;
   onDisconnect: () => void;
+  // onToggleTheme prop'ları kaldırıldı
 }
-const UserMenu: React.FC<UserMenuProps> = ({ user, onDisconnect }) => {
+const UserMenu: React.FC<UserMenuProps> = ({
+  user,
+  onDisconnect,
+}) => {
   return (
     <div className="relative inline-block text-left">
       <Menu>
         <Menu.Button className="flex items-center gap-2 p-1.5 pr-3 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-          {/*
-            İSTEK 3 ÇÖZÜMÜ: '62' avatarı (<img>) kaldırıldı.
-            Sadece 'displayName' (adres) gösteriliyor.
-          */}
-          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 px-2">
+          <img
+            src={user.avatarUrl}
+            alt="Avatar"
+            className="w-8 h-8 rounded-full border-2 border-gray-200 dark:border-gray-600"
+          />
+          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
             {user.displayName}
           </span>
           <ChevronDown
@@ -292,7 +307,7 @@ const UserMenu: React.FC<UserMenuProps> = ({ user, onDisconnect }) => {
           leaveTo="transform opacity-0 scale-95"
         >
           <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-            {/* İSTEK 1 ÇÖZÜMÜ: Tema tuşu menüden kaldırıldı */}
+            {/* Tema bölümü (py-1) kaldırıldı */}
             <div className="py-1">
               <Menu.Item>
                 {({ active }: { active: boolean }) => (
@@ -389,9 +404,9 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (readerEvent) => { // VERCEL HATASI DÜZELTMESİ: 'e' yerine 'readerEvent'
+    reader.onload = (readerEvent) => { // VERCEL HATASI DÜZELTMESİ: 'e' -> 'readerEvent'
       try {
-        const text = readerEvent.target?.result as string; // 'e' yerine 'readerEvent'
+        const text = readerEvent.target?.result as string; // VERCEL HATASI DÜZELTMESİ: 'e' -> 'readerEvent'
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const importedProjects: any[] = JSON.parse(text);
 
@@ -773,13 +788,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                 {task.text}
               </label>
             </div>
-            
-            {/*
-              İSTEK 2 ÇÖZÜMÜ:
-              'opacity-0 group-hover:opacity-100' kaldırıldı
-              ve etiketler hep görünür hale getirildi.
-            */}
-            <div className="flex items-center gap-2 ml-auto transition">
+
+            <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
               <PriorityTag priority={task.priority} />
               {task.dueDate && (
                 <span
