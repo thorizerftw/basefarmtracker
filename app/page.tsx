@@ -15,10 +15,9 @@ import {
   Edit2,
   // Check, // VERCEL HATASI DÜZELTMESİ: 'Check' kullanılmadığı için kaldırıldı
   ChevronDown,
-  // Sun, // VERCEL HATASI DÜZELTMESİ: 'Sun' kullanılmadığı için kaldırıldı
-  // Moon, // VERCEL HATASI DÜZELTMESİ: 'Moon' kullanılmadığı için kaldırıldı
+  // 'Sun' ve 'Moon' önceki Vercel hatasında kaldırılmıştı
 } from 'lucide-react';
-// import { useTheme } from 'next-themes'; // VERCEL HATASI DÜZELTMESİ: 'useTheme' kullanılmadığı için kaldırıldı
+// 'useTheme' önceki Vercel hatasında kaldırılmıştı
 import { sendReadySignal } from './utils';
 import { Menu, Transition } from '@headlessui/react';
 
@@ -55,9 +54,6 @@ interface Project {
 export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  // 'useTheme' import'u kaldırıldığı için bu satır da kaldırıldı.
-  // const { theme, setTheme, resolvedTheme } = useTheme();
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
 
@@ -201,15 +197,13 @@ export default function HomePage() {
 
   // Temayı <html> tag'ine uygula
   useEffect(() => {
-    // 'useTheme' kaldırıldığı için, varsayılan olarak 'dark' modu zorluyoruz
+    // Varsayılan olarak 'dark' modu zorluyoruz
     document.documentElement.classList.add('dark');
   }, []);
 
   if (!isClient) {
     return null;
   }
-
-  // 'useTheme' kaldırıldığı için 'toggleTheme' fonksiyonu da kaldırıldı
 
   return (
     <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
@@ -222,7 +216,6 @@ export default function HomePage() {
           <UserMenu
             user={currentUser}
             onDisconnect={handleDisconnect}
-            // onToggleTheme prop'u kaldırıldı
           />
         ) : (
           <button
@@ -249,7 +242,6 @@ export default function HomePage() {
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
   onConnect: () => void;
-  // onToggleTheme prop'ları kaldırıldı
 }
 const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
   <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative">
@@ -265,7 +257,6 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
     >
       Connect Wallet
     </button>
-    {/* Tema tuşu (sağ üst köşe) kaldırıldı */}
   </div>
 );
 
@@ -274,7 +265,6 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
 interface UserMenuProps {
   user: User;
   onDisconnect: () => void;
-  // onToggleTheme prop'ları kaldırıldı
 }
 const UserMenu: React.FC<UserMenuProps> = ({
   user,
@@ -404,9 +394,11 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    reader.onload = (readerEvent) => { // VERCEL HATASI DÜZELTMESİ: 'e' -> 'readerEvent'
+    // VERCEL HATASI DÜZELTMESİ: '(e)' -> '(readerEvent)'
+    reader.onload = (readerEvent) => {
       try {
-        const text = readerEvent.target?.result as string; // VERCEL HATASI DÜZELTMESİ: 'e' -> 'readerEvent'
+        // VERCEL HATASI DÜZELTMESİ: 'e.target' -> 'readerEvent.target'
+        const text = readerEvent.target?.result as string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const importedProjects: any[] = JSON.parse(text);
 
@@ -448,7 +440,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
               : 0;
           const progressB =
             b.tasks.length > 0
-              ? (b.tasks.filter((t) => t.completed).length / b.tasks.length) * 100
+              ? (a.tasks.filter((t) => t.completed).length / b.tasks.length) * 100
               : 0;
           return progressB - progressA;
         });
