@@ -1,43 +1,42 @@
 'use client';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-// MiniKitProvider ve OnchainKitProvider'ı KULLANMIYORUZ.
-import { WagmiProvider, createConfig, http } from 'wagmi';
-import { base } from 'wagmi/chains';
-import { injected } from 'wagmi/connectors';
-import { coinbaseWallet } from 'wagmi/connectors';
-import { ThemeProvider } from 'next-themes';
 import { ReactNode } from 'react';
+import { base } from 'wagmi/chains';
+// SADECE BUNU KULLANIYORUZ:
+import { OnchainKitProvider } from '@coinbase/onchainkit';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
+// 'OnchainKitProvider' Wagmi'yi kendi içinde kurar,
+// ama 'react-query' için buna hâlâ ihtiyacımız var (Vercel build hatası için).
 const queryClient = new QueryClient();
 
-const wagmiConfig = createConfig({
-  // Hatalı "autoConnect" ayarını buradan sildik.
-  
-  chains: [base],
-  transports: {
-    [base.id]: http(),
-  },
-  connectors: [
-    injected(), // Metamask, Farcaster vb.
-    coinbaseWallet({
-      appName: 'BaseFarm Tracker', 
-      preference: 'smartWalletOnly',
-    }),
-  ],
-});
-
 export function RootProvider({ children }: { children: ReactNode }) {
+  // .env.local dosyana NEXT_PUBLIC_ONCHAINKIT_API_KEY eklemiş olmalısın
+  const apiKey = process.env.NEXT_PUBLIC_ONCHAINKIT_API_KEY || '';
+
   return (
-    // --- NİHAİ ÇÖZÜM (WAGMI V2 İÇİN) ---
-    // "Not Authorized" hatasını çözmek için 'reconnectOnMount'
-    // özelliğini 'false' yapıyoruz.
-    <WagmiProvider config={wagmiConfig} reconnectOnMount={false}>
-      <QueryClientProvider client={queryClient}>
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          {children}
-        </ThemeProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
+    <QueryClientProvider client={queryClient}>
+      <OnchainKitProvider
+        apiKey={apiKey}
+        chain={base}
+        // BU AYARLAR ARKADAŞININ KODUNDAN ALINDI
+        config={{
+          appearance: {
+            mode: 'auto', // Temayı otomat
+          },
+          wallet: {
+            display: 'modal', // "Connect" butonuna basınca MODAL AÇ
+            preference: 'all', // Metamask, CB Wallet hepsini göster
+          },
+        }}
+        // "NOT READY" VE "NOT AUTHORIZED" SORUNUNUN ÇÖZÜMÜ
+        miniKit={{
+          enabled: true,
+          autoConnect: true,
+        }}
+      >
+        {children}
+      </OnchainKitProvider>
+    </QueryClientProvider>
   );
 }

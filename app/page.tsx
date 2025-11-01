@@ -16,8 +16,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
-// --- WAGMI HOOK'LARINI (KANCALARINI) İMPORT EDİYORUZ ---
-import { useConnect, useAccount, useDisconnect } from 'wagmi';
+// WAGMI hook'larını ve ConnectButton'ı SİLDİK
 
 // --- Tipler (Interfaces) ---
 
@@ -48,16 +47,12 @@ interface Project {
   details: ProjectDetails;
 }
 
-
-// --- ÇÖZÜM ADIM 1: TÜM UYGULAMA MANTIĞI (SENİN ESKİ 'HomePage') ARTIK 'FarmTrackerApp' ADINDA ---
-// Bu bileşen, SADECE "isAppReady" true olduktan sonra render edilecek.
-function FarmTrackerApp() {
-  // --- YENİ WAGMI CÜZDAN YÖNETİMİ ---
+// --- Ana Sayfa Bileşeni ---
+export default function HomePage() {
+  const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const { address, isConnected } = useAccount(); // Wagmi'den bağlantı durumunu al
-  const { disconnect } = useDisconnect(); // Wagmi'den bağlantı kesme fonksiyonunu al
-  const { connect, connectors } = useConnect(); // Wagmi'den cüzdan seçeneklerini al
-  // --- /YENİ WAGMI CÜZDAN YÖNETİMİ ---
+
+  // --- Cüzdan Bağlantı Mantığı (Eski, DOĞRU yönteme döndük) ---
 
   const buildUserProfile = useCallback(async (address: string): Promise<User> => {
     try {
@@ -95,80 +90,112 @@ function FarmTrackerApp() {
     };
   }, []);
 
-  // --- WAGMI'NİN DURUMUNA GÖRE KULLANICIYI GÜNCELLE ---
-  useEffect(() => {
-    if (isConnected && address) {
-      buildUserProfile(address).then(setCurrentUser);
-      localStorage.setItem('basefarm_connected_address', address);
-    } else if (!isConnected) {
-      setCurrentUser(null);
-      localStorage.removeItem('basefarm_connected_address');
+  const handleDisconnect = useCallback(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ethereum = (window as any).ethereum;
+    try {
+      await ethereum?.request?.({
+        method: 'wallet_revokePermissions',
+        params: [{ eth_accounts: {} }],
+      });
+    } catch (e) {
+      console.warn('Revoke permissions failed', e);
     }
-  }, [isConnected, address, buildUserProfile]);
-
-  // Temayı <html> tag'ine uygula
-  useEffect(() => {
-    document.documentElement.classList.add('dark');
+    localStorage.removeItem('basefarm_connected_address');
+    setCurrentUser(null);
   }, []);
 
-  // --- MODAL İÇİN CÜZDANLARI LİSTELE ---
-  // Artık "No wallet connector found" hatası almayacağız
-  const walletButtons = connectors
-    .filter((c) => c.ready)
-    .map((connector) => (
-      <button
-        key={connector.id}
-        onClick={() => connect({ connector })}
-        className="mt-6 w-full px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-      >
-        {connector.name}
-      </button>
-    ));
+  const handleConnect = useCallback(async () => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) {
+      alert('Please install a wallet extension like MetaMask.');
+      return;
+    }
+    try {
+      // OnchainKitProvider bu isteği yakalayıp MODAL açacak
+      const accounts: string[] = await ethereum.request({
+        method: 'eth_requestAccounts',
+      });
+      if (!accounts?.length) return;
+      
+      const addr = accounts[0];
+      const user = await buildUserProfile(addr);
+      localStorage.setItem('basefarm_connected_address', addr);
+      setCurrentUser(user);
+    } catch (e) {
+      console.warn('Wallet connection refused', e);
+    }
+  }, [buildUserProfile]);
 
-  return (
-    <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
-      {/* Header (Başlık) */}
-      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center w-full max-w-5xl mx-auto">
-        <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
-          BaseFarm Tracker
-        </h1>
-        {currentUser ? (
-          <UserMenu
-            user={currentUser}
-            onDisconnect={() => disconnect()}
-          />
-        ) : (
-          connectors[0] && (
-            <button
-              onClick={() => connect({ connector: connectors[0] })}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-            >
-              Connect Wallet
-            </button>
-          )
-        )}
-      </header>
+  // Sayfa yüklendiğinde cüzdanı kontrol et
+  // 'miniKit.autoConnect' sayesinde bu artık "Not Authorized" hatası vermeyecek
+  useEffect(() => {
+    const savedAddress = localStorage.getItem('basefarm_connected_address');
+    if (!savedAddress) return;
 
-      {/* Ana İçerik */}
-      <main className="w-full max-w-3xl">
-        {currentUser ? (
-          <FarmTracker userAddress={currentUser.address} />
-        ) : (
-          <ConnectScreen walletButtons={walletButtons} />
-        )}
-      </main>
-    </div>
-  );
-}
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ethereum = (window as any).ethereum;
+    if (!ethereum) return;
 
+    ethereum
+      .request({ method: 'eth_accounts' })
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .then(async (accounts: string[]) => {
+        if (
+          accounts?.length &&
+          accounts[0]?.toLowerCase() === savedAddress.toLowerCase()
+        ) {
+          const user = await buildUserProfile(accounts[0]);
+          setCurrentUser(user);
+        } else {
+          localStorage.removeItem('basefarm_connected_address');
+          setCurrentUser(null);
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem('basefarm_connected_address');
+        setCurrentUser(null);
+      });
+  }, [buildUserProfile]);
 
-// --- ÇÖZÜM ADIM 2: BU BİLEŞEN ARTIK TEK 'EXPORT DEFAULT' ---
-// Bu, "sihirli" 'Ready' kodunu çalıştıran ve "kilidi" tutan ana bileşen.
-export default function Page() {
-  const [isClient, setIsClient] = useState(false);
-  const [isAppReady, setIsAppReady] = useState(false);
+  // Hesap değişimini yakala (Bu da manuel kalmalı)
+  useEffect(() => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const ethereum = (window as any).ethereum;
+    if (!ethereum || !ethereum.on) return;
 
-  // --- "NOT READY" SİNYALİNİ YOLLA VE KİLİDİ AÇ ---
+    const onAccountsChanged = (accounts: string[]) => {
+      if (!accounts?.length) {
+        handleDisconnect();
+        return;
+      }
+      const newAddr = accounts[0];
+      if (
+        currentUser &&
+        newAddr.toLowerCase() !== currentUser.address.toLowerCase()
+      ) {
+        // Otomatik bağlanma yerine disconnect yap, kullanıcı tekrar bağlansın
+        handleDisconnect();
+      }
+    };
+
+    ethereum.on('accountsChanged', onAccountsChanged);
+    return () => {
+      try {
+        ethereum.removeListener('accountsChanged', onAccountsChanged);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      } catch (_e) {
+        // no-op
+      }
+    };
+  }, [currentUser, handleDisconnect]);
+
+  // --- /Cüzdan Bağlantı Mantığı ---
+
+  // --- "NOT READY" SİNYALİNİ YOLLAYAN MANUEL KOD ---
+  // (Arkadaşının 'page.tsx' dosyasından. 'miniKit' ayarına ek olarak
+  // bunu da ekleyerek "Ready" sinyalini garantiliyoruz)
   useEffect(() => {
     setIsClient(true); 
 
@@ -182,14 +209,12 @@ export default function Page() {
           m.actions.ready();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (m.logger?.info || console.log)("ready_sent(actions.ready)");
-          setIsAppReady(true); // <-- KİLİDİ AÇ
           return true;
         }
         if (m.ready) {
           m.ready();
            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (m.logger?.info || console.log)("ready_sent(ready)");
-          setIsAppReady(true); // <-- KİLİDİ AÇ
           return true;
         }
       } catch (e) {
@@ -203,40 +228,61 @@ export default function Page() {
     let tries = 0;
     const id = setInterval(() => {
       tries++;
-      if (tryReady() || tries > 20) {
-        clearInterval(id);
-        if (!isAppReady) setIsAppReady(true); 
-      }
+      if (tryReady() || tries > 20) clearInterval(id);
     }, 500);
 
     return () => clearInterval(id);
+  }, []); 
+
+  // Temayı <html> tag'ine uygula
+  useEffect(() => {
+    // Varsayılan olarak 'dark' modu zorluyoruz
+    document.documentElement.classList.add('dark');
   }, []);
 
   if (!isClient) {
-    return null; // SSR'da hiçbir şey gösterme
+    return null;
   }
 
-  // Kilit açılana kadar (isAppReady=true) cüzdan kancaları (hook) çağrılmaz
   return (
-    <>
-      {isAppReady ? (
-        <FarmTrackerApp />
-      ) : (
-        // Sayfa yüklenirken "Not Ready" demesin diye basit bir yükleme ekranı
-        <div className="flex justify-center items-center min-h-screen bg-gray-100 dark:bg-gray-900 p-4">
-          <p className="text-gray-900 dark:text-gray-100">Loading Base Tracker...</p>
-        </div>
-      )}
-    </>
+    <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
+      {/* Header (Başlık) */}
+      <header className="absolute top-0 left-0 right-0 p-4 flex justify-between items-center w-full max-w-5xl mx-auto">
+        <h1 className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+          BaseFarm Tracker
+        </h1>
+        {currentUser ? (
+          <UserMenu
+            user={currentUser}
+            onDisconnect={handleDisconnect}
+          />
+        ) : (
+          <button
+            onClick={handleConnect} // MANUEL 'handleConnect' fonksiyonunu çağır
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+          >
+            Connect Wallet
+          </button>
+        )}
+      </header>
+
+      {/* Ana İçerik */}
+      <main className="w-full max-w-3xl">
+        {currentUser ? (
+          <FarmTracker userAddress={currentUser.address} />
+        ) : (
+          <ConnectScreen onConnect={handleConnect} />
+        )}
+      </main>
+    </div>
   );
 }
 
-
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
-  walletButtons: React.ReactNode[]; // Butonları prop olarak al
+  onConnect: () => void;
 }
-const ConnectScreen: React.FC<ConnectScreenProps> = ({ walletButtons }) => (
+const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
   <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative">
     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
       Welcome to Farm Tracker
@@ -244,16 +290,12 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ walletButtons }) => (
     <p className="mt-2 text-gray-600 dark:text-gray-300">
       Please connect your wallet to manage tasks.
     </p>
-    <div className="mt-4 space-y-2">
-      {walletButtons.length > 0 ? (
-        walletButtons
-      ) : (
-        // Bu hata artık görünmemeli
-        <p className="text-red-500">
-          No wallet connector found. Please install MetaMask or Coinbase Wallet.
-        </p>
-      )}
-    </div>
+    <button
+      onClick={onConnect} // MANUEL 'handleConnect' fonksiyonunu çağır
+      className="mt-6 px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+    >
+      Connect Wallet
+    </button>
   </div>
 );
 
@@ -294,11 +336,12 @@ const UserMenu: React.FC<UserMenuProps> = ({
           leaveTo="transform opacity-0 scale-95"
         >
           <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
+            {/* Tema bölümü (py-1) kaldırıldı */}
             <div className="py-1">
               <Menu.Item>
                 {({ active }: { active: boolean }) => (
                   <button
-                    onClick={onDisconnect} 
+                    onClick={onDisconnect}
                     className={`${
                       active
                         ? 'bg-red-50 dark:bg-gray-700 text-red-600 dark:text-red-400'
@@ -334,6 +377,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     try {
       const storageKey = getStorageKey('farm-tracker');
       const saved = localStorage.getItem(storageKey);
+      // VERCEL UYARISI DÜZELTMESİ (1/2): 'any' tip uyarısını kaldırmak için 'eslint-disable' yorumunu sildim
       const parsedProjects = (saved ? JSON.parse(saved) : []) as Project[];
       return parsedProjects.map((p) => ({
         ...p,
@@ -389,8 +433,10 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
+    // VERCEL HATASI DÜZELTMESİ (2/2): '(e)' -> '(readerEvent)'
     reader.onload = (readerEvent) => { 
       try {
+        // VERCEL HATASI DÜZELTMESİ (2/2): 'e.target' -> 'readerEvent.target'
         const text = readerEvent.target?.result as string; 
         const importedProjects: Project[] = JSON.parse(text);
 
@@ -974,7 +1020,6 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             />
           </div>
           <div className="md:col-span-2">
-            {/* --- BENİM YAZIM HATAMDI, DÜZELTTİM ('LabeL' -> 'label') --- */}
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
               Notes
             </label>
