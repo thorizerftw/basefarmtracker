@@ -398,11 +398,13 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    // VERCEL HATASI DÜZELTMESİ (2/2): '(e)' -> '(readerEvent)'
+    
+    // HATA BURADAYDI: '(e)' -> '(readerEvent)'
     reader.onload = (readerEvent) => { 
       try {
-        // VERCEL HATASI DÜZELTMESİ (2/2): 'e.target' -> 'readerEvent.target'
-        const text = readerEvent.target?.result as string;
+        // HATA BURADAYDI: 'e.target' -> 'readerEvent.target'
+        const text = readerEvent.target?.result as string; 
+        
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const importedProjects: any[] = JSON.parse(text);
 
