@@ -13,11 +13,12 @@ import {
   Plus,
   Trash2,
   Edit2,
-  // Check, // VERCEL HATASI DÜZELTMESİ: 'Check' kullanılmadığı için kaldırıldı
+  // Check, // Vercel build hatasını önlemek için bu kaldırıldı (kullanılmıyor)
   ChevronDown,
-  // 'Sun' ve 'Moon' önceki Vercel hatasında kaldırılmıştı
+  Sun,
+  Moon,
 } from 'lucide-react';
-// 'useTheme' önceki Vercel hatasında kaldırılmıştı
+import { useTheme } from 'next-themes';
 import { sendReadySignal } from './utils';
 import { Menu, Transition } from '@headlessui/react';
 
@@ -54,6 +55,8 @@ interface Project {
 export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const { theme, setTheme, resolvedTheme } = useTheme();
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
 
@@ -197,13 +200,20 @@ export default function HomePage() {
 
   // Temayı <html> tag'ine uygula
   useEffect(() => {
-    // Varsayılan olarak 'dark' modu zorluyoruz
-    document.documentElement.classList.add('dark');
-  }, []);
+    if (resolvedTheme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [resolvedTheme]);
 
   if (!isClient) {
     return null;
   }
+
+  const toggleTheme = () => {
+    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
+  };
 
   return (
     <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
@@ -216,6 +226,8 @@ export default function HomePage() {
           <UserMenu
             user={currentUser}
             onDisconnect={handleDisconnect}
+            onToggleTheme={toggleTheme}
+            currentTheme={resolvedTheme}
           />
         ) : (
           <button
@@ -232,7 +244,7 @@ export default function HomePage() {
         {currentUser ? (
           <FarmTracker userAddress={currentUser.address} />
         ) : (
-          <ConnectScreen onConnect={handleConnect} />
+          <ConnectScreen onConnect={handleConnect} onToggleTheme={toggleTheme} currentTheme={resolvedTheme} />
         )}
       </main>
     </div>
@@ -242,8 +254,10 @@ export default function HomePage() {
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
   onConnect: () => void;
+  onToggleTheme: () => void;
+  currentTheme?: string;
 }
-const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
+const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect, onToggleTheme, currentTheme }) => (
   <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative">
     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
       Welcome to Farm Tracker
@@ -257,6 +271,13 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
     >
       Connect Wallet
     </button>
+    <button
+      onClick={onToggleTheme}
+      className="absolute top-4 right-4 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
+      aria-label="Toggle Theme"
+    >
+      {currentTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
+    </button>
   </div>
 );
 
@@ -265,10 +286,14 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
 interface UserMenuProps {
   user: User;
   onDisconnect: () => void;
+  onToggleTheme: () => void;
+  currentTheme?: string;
 }
 const UserMenu: React.FC<UserMenuProps> = ({
   user,
   onDisconnect,
+  onToggleTheme,
+  currentTheme,
 }) => {
   return (
     <div className="relative inline-block text-left">
@@ -297,7 +322,27 @@ const UserMenu: React.FC<UserMenuProps> = ({
           leaveTo="transform opacity-0 scale-95"
         >
           <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-            {/* Tema bölümü (py-1) kaldırıldı */}
+            <div className="py-1">
+              <Menu.Item>
+                {({ active }: { active: boolean }) => (
+                  <button
+                    onClick={onToggleTheme}
+                    className={`${
+                      active
+                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
+                        : 'text-gray-700 dark:text-gray-300'
+                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
+                  >
+                    {currentTheme === 'dark' ? (
+                      <Sun size={16} className="mr-2" />
+                    ) : (
+                      <Moon size={16} className="mr-2" />
+                    )}
+                    Toggle Theme
+                  </button>
+                )}
+              </Menu.Item>
+            </div>
             <div className="py-1">
               <Menu.Item>
                 {({ active }: { active: boolean }) => (
@@ -394,10 +439,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    // VERCEL HATASI DÜZELTMESİ: '(e)' -> '(readerEvent)'
     reader.onload = (readerEvent) => {
       try {
-        // VERCEL HATASI DÜZELTMESİ: 'e.target' -> 'readerEvent.target'
         const text = readerEvent.target?.result as string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const importedProjects: any[] = JSON.parse(text);
@@ -440,7 +483,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
               : 0;
           const progressB =
             b.tasks.length > 0
-              ? (a.tasks.filter((t) => t.completed).length / b.tasks.length) * 100
+              ? (b.tasks.filter((t) => t.completed).length / b.tasks.length) * 100
               : 0;
           return progressB - progressA;
         });
@@ -695,7 +738,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const dueDate = new Date(task.dueDate);
+      
+      // HATA ÇÖZÜMÜ: 'dateString' -> 'task.dueDate'
+      const dueDate = new Date(task.dueDate); 
+      
       const userTimezoneOffset = dueDate.getTimezoneOffset() * 60000;
       const correctedDate = new Date(dueDate.getTime() + userTimezoneOffset);
       if (isNaN(correctedDate.getTime())) return '';
