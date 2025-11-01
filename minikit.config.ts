@@ -13,16 +13,16 @@ const ROOT_URL =
 export const minikitConfig: MiniAppManifest = {
   // "Not Ready" sorununu çözen dolu Account Association
   accountAssociation: {
-    header: "eyJleHAiOjE3MzMyNCAgICAgICJ0eXBlIjoiY3VzdG9keSIsImtleSI6IjB4NzlhMEYwNDQ3OTYzODExMTc3M2Y4N2EwNWI2YzBlZDIxRkQxNWMwYjE3M2JlNDgiLCJpYXQiOjE3MDE3MDg4MjR9",
+    header: "eyJmaWQiOjQ1NzAxMSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDZBRTI4NTJBMDAxYmI5YjM4MTMzZThjNzg1MURmMzlGRDI5QzIxODYifQ",
     payload: "eyJkb21haW4iOiJiYXNlZmFybXRyYWNrZXIudmVyY2VsLmFwcCJ9",
-    signature: "MHhkNGMwYWYxOWIwMzQxMzJmN2EwN2E1MDUxZmYwMjRlOTRhMWE0ZWM0YjMwZGUxYjljMmQ1MGUzNjJlZDcyYWYyMjZlMGIyYmM1YTA1NTQ2M2QwMjU2YjI4YjcxMmI2MmExODc4YjU3ZjJmNjM5MWFhNjViNmMxM2JiNWE0MWIxYg==",
+    signature: "ofqEMGVsK6DnVGDDfGWWwic4v3JRmUY39c2aiTZSBVpLVWgyPHstle6BzBawy/a9+jgY+2dNVKZLQq5yI/5+nhs=",
   },
 
   // --- HATANIN ÇÖZÜMÜ BURADA ---
   // TypeScript'e bu hatayı görmezden gelmesini söylüyoruz:
   // @ts-ignore 
   baseBuilder: {
-    ownerAddress: "0xf286BaA11A1B1D81C387c9BF1F82797A9a369A05",
+    ownerAddress: "0xf2868e11a1A1c8201c9b38f51827973a9362fA95",
   },
 
   miniapp: {
