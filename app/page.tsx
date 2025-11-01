@@ -17,7 +17,8 @@ import {
   // Sun ve Moon, Vercel hatasını (kullanılmıyor) çözmek için kaldırıldı
 } from 'lucide-react';
 // useTheme, Vercel hatasını (kullanılmıyor) çözmek için kaldırıldı
-import { sendReadySignal } from './utils';
+// "sendReadySignal" import'unu sildik, çünkü arkadaşının yöntemini kullanacağız:
+// import { sendReadySignal } from './utils'; 
 import { Menu, Transition } from '@headlessui/react';
 
 // --- Tipler (Interfaces) ---
@@ -190,10 +191,51 @@ export default function HomePage() {
 
   // --- /Cüzdan Bağlantı Mantığı ---
 
+  // --- "NOT READY" SORUNUNUN ÇÖZÜMÜ (Arkadaşının kodundan alındı) ---
+  // Senin "sendReadySignal()" satırını silip bunu ekledik.
   useEffect(() => {
-    setIsClient(true);
-    sendReadySignal();
-  }, []);
+    // Bu, hydration hatasını (isClient) önlemek için kalmalı
+    setIsClient(true); 
+
+    // Arkadaşının "Ready" sinyal kodu
+    const tryReady = () => {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const m = (window as any)?.miniapp;
+      if (!m) return false;
+
+      try {
+        // Yeni SDK: sdk.actions.ready()
+        if (m.actions?.ready) {
+          m.actions.ready();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (m.logger?.info || console.log)("ready_sent(actions.ready)");
+          return true;
+        }
+        // Eski/alternatif: sdk.ready()
+        if (m.ready) {
+          m.ready();
+           // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (m.logger?.info || console.log)("ready_sent(ready)");
+          return true;
+        }
+      } catch (e) {
+         console.warn('Ready signal failed', e);
+      }
+      return false;
+    };
+
+    if (tryReady()) return;
+
+    // miniapp objesi geç gelebilir -> 10 sn boyunca dene
+    let tries = 0;
+    const id = setInterval(() => {
+      tries++;
+      if (tryReady() || tries > 20) clearInterval(id);
+    }, 500);
+
+    return () => clearInterval(id);
+  }, []); // Boş dependency array'i [ ] kalmalı
+  // --- ÇÖZÜMÜN SONU ---
 
   // Temayı <html> tag'ine uygula
   useEffect(() => {
