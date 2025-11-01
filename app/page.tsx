@@ -48,7 +48,8 @@ interface Project {
   details: ProjectDetails;
 }
 
-// --- ÇÖZÜM ADIM 1: TÜM UYGULAMA MANTIĞINI BU YENİ BİLEŞENE TAŞIDIK ---
+
+// --- ÇÖZÜM ADIM 1: TÜM UYGULAMA MANTIĞI (SENİN ESKİ 'HomePage') ARTIK 'FarmTrackerApp' ADINDA ---
 // Bu bileşen, SADECE "isAppReady" true olduktan sonra render edilecek.
 function FarmTrackerApp() {
   // --- YENİ WAGMI CÜZDAN YÖNETİMİ ---
@@ -96,8 +97,6 @@ function FarmTrackerApp() {
 
   // --- WAGMI'NİN DURUMUNA GÖRE KULLANICIYI GÜNCELLE ---
   useEffect(() => {
-    // Bu bileşen zaten "Ready" olduktan sonra çalıştığı için
-    // "isAppReady" kilidine burada artık gerek yok.
     if (isConnected && address) {
       buildUserProfile(address).then(setCurrentUser);
       localStorage.setItem('basefarm_connected_address', address);
@@ -163,7 +162,8 @@ function FarmTrackerApp() {
 }
 
 
-// --- ÇÖZÜM ADIM 2: ANA SAYFA BİLEŞENİ (PAGE) ARTIK SADECE "READY" SİNYALİ VERİYOR ---
+// --- ÇÖZÜM ADIM 2: BU BİLEŞEN ARTIK TEK 'EXPORT DEFAULT' ---
+// Bu, "sihirli" 'Ready' kodunu çalıştıran ve "kilidi" tutan ana bileşen.
 export default function Page() {
   const [isClient, setIsClient] = useState(false);
   const [isAppReady, setIsAppReady] = useState(false);
@@ -974,10 +974,10 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
             />
           </div>
           <div className="md:col-span-2">
+            {/* --- BENİM YAZIM HATAMDI, DÜZELTTİM ('LabeL' -> 'label') --- */}
             <label className="block text-sm font-medium text-gray-600 dark:text-gray-300 mb-1">
               Notes
             </label>
-            {/* --- BENİM YAZIM HATAMDI, DÜZELTTİM --- */}
             <textarea
               placeholder="Your strategy, thoughts, next steps..."
               value={project.details?.notes || ''}
