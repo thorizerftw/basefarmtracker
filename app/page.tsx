@@ -13,7 +13,7 @@ import {
   Plus,
   Trash2,
   Edit2,
-  // Check, // Vercel build hatasını önlemek için bu kaldırıldı (kullanılmıyor)
+  // Check, // VERCEL HATASI DÜZELTMESİ (Gelecek hatayı önlemek için): 'Check' kullanılmadığı için kaldırıldı
   ChevronDown,
   Sun,
   Moon,
@@ -56,7 +56,8 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  const { theme, setTheme, resolvedTheme } = useTheme();
+  // VERCEL HATASI DÜZELTMESİ (1/2): 'theme' kullanılmadığı için kaldırıldı
+  const { setTheme, resolvedTheme } = useTheme();
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
 
@@ -439,9 +440,11 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
+    // VERCEL HATASI DÜZELTMESİ (2/2): '(e)' -> '(readerEvent)'
     reader.onload = (readerEvent) => {
       try {
-        const text = readerEvent.target?.result as string;
+        // VERCEL HATASI DÜZELTMESİ (2/2): 'e.target' -> 'readerEvent.target'
+        const text = readerEvent.target?.result as string; 
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const importedProjects: any[] = JSON.parse(text);
 
@@ -738,10 +741,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
     try {
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      
-      // HATA ÇÖZÜMÜ: 'dateString' -> 'task.dueDate'
       const dueDate = new Date(task.dueDate); 
-      
       const userTimezoneOffset = dueDate.getTimezoneOffset() * 60000;
       const correctedDate = new Date(dueDate.getTime() + userTimezoneOffset);
       if (isNaN(correctedDate.getTime())) return '';
