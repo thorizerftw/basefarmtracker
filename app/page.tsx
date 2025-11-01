@@ -181,6 +181,7 @@ export default function HomePage() {
     return () => {
       try {
         ethereum.removeListener('accountsChanged', onAccountsChanged);
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
       } catch (_e) {
         // no-op
       }
