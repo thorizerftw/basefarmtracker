@@ -181,7 +181,7 @@ export default function HomePage() {
     return () => {
       try {
         ethereum.removeListener('accountsChanged', onAccountsChanged);
-      } catch (e) {
+      } catch (_e) {
         // no-op
       }
     };
