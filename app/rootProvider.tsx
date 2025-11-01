@@ -11,8 +11,8 @@ import { ReactNode } from 'react';
 const queryClient = new QueryClient();
 
 const wagmiConfig = createConfig({
-  // --- NİHAİ ÇÖZÜM: TypeScript hatasını Vercel'in istediği gibi sustur ---
-  // @ts-expect-error
+  // --- NİHAİ ÇÖZÜM: Vercel'in istediği gibi açıklama ekledik ---
+  // @ts-expect-error autoConnect "Not Ready" sorununu çözmek için gerekli
   autoConnect: false,
   // ---
   

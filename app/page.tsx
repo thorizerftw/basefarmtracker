@@ -99,6 +99,7 @@ export default function HomePage() {
   }, []);
 
   // --- WAGMI'NİN DURUMUNA GÖRE KULLANICIYI GÜNCELLE ---
+  // VERCEL'İN UYARDIĞI YER BURASIYDI, "isAppReady" EKLEDİK
   useEffect(() => {
     // "Not Ready" kilidi: Uygulama hazır olmadan cüzdanı kontrol etme
     if (isAppReady && isConnected && address) {
