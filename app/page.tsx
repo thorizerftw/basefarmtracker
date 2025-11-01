@@ -13,12 +13,9 @@ import {
   Plus,
   Trash2,
   Edit2,
-  // Check, // VERCEL HATASI DÜZELTMESİ (Gelecek hatayı önlemek için): 'Check' kullanılmadığı için kaldırıldı
   ChevronDown,
-  Sun,
-  Moon,
 } from 'lucide-react';
-import { useTheme } from 'next-themes';
+// import { useTheme } from 'next-themes'; // VERCEL HATASI DÜZELTMESİ: 'useTheme' 59. satırda kullanılmadığı için ana import'u sildim
 import { sendReadySignal } from './utils';
 import { Menu, Transition } from '@headlessui/react';
 
@@ -27,7 +24,7 @@ import { Menu, Transition } from '@headlessui/react';
 type User = {
   address: string;
   displayName: string;
-  avatarUrl: string;
+  avatarUrl: string; // İSTEK 3: "62" avatarı için bunu artık kullanmayacağız
 };
 
 interface Task {
@@ -56,8 +53,7 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // VERCEL HATASI DÜZELTMESİ (1/2): 'theme' kullanılmadığı için kaldırıldı
-  const { setTheme, resolvedTheme } = useTheme();
+  // VERCEL HATASI DÜZELTMESİ: 'useTheme' 59. satırda kullanılmıyordu, buradan kaldırdım.
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
 
@@ -68,32 +64,27 @@ export default function HomePage() {
       if (w.ethereum?.isCoinbaseWallet && w.ethereum?.coinbase?.getUser) {
         const user = await w.ethereum.coinbase.getUser();
         const display = user?.data?.profile?.displayName;
-        const image = user?.data?.profile?.profileImageUrl;
-        const initials = (display || address.substring(2, 4))
-          .substring(0, 2)
-          .toUpperCase();
         return {
           address,
+          // İSTEK 3 ÇÖZÜMÜ: 'displayName' (örn: 0x123...f6e4) kullan
           displayName:
             display ||
             `${address.substring(0, 6)}...${address.substring(
               address.length - 4,
             )}`,
-          avatarUrl:
-            image ||
-            `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
+          avatarUrl: '', // İSTEK 3 ÇÖZÜMÜ: "62" avatarını artık kullanmıyoruz
         };
       }
     } catch (e) {
       console.warn('Coinbase user profile fetch failed', e);
     }
-    const initials = address.substring(2, 4).toUpperCase();
+    // Fallback
     return {
       address,
       displayName: `${address.substring(0, 6)}...${address.substring(
         address.length - 4,
       )}`,
-      avatarUrl: `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
+      avatarUrl: '', // İSTEK 3 ÇÖZÜMÜ: "62" avatarını artık kullanmıyoruz
     };
   }, []);
 
@@ -199,22 +190,14 @@ export default function HomePage() {
     sendReadySignal();
   }, []);
 
-  // Temayı <html> tag'ine uygula
+  // İSTEK 1 ÇÖZÜMÜ: Temayı <html> tag'ine uygula (hep dark)
   useEffect(() => {
-    if (resolvedTheme === 'dark') {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [resolvedTheme]);
+    document.documentElement.classList.add('dark');
+  }, []);
 
   if (!isClient) {
     return null;
   }
-
-  const toggleTheme = () => {
-    setTheme(resolvedTheme === 'dark' ? 'light' : 'dark');
-  };
 
   return (
     <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
@@ -227,8 +210,6 @@ export default function HomePage() {
           <UserMenu
             user={currentUser}
             onDisconnect={handleDisconnect}
-            onToggleTheme={toggleTheme}
-            currentTheme={resolvedTheme}
           />
         ) : (
           <button
@@ -245,7 +226,7 @@ export default function HomePage() {
         {currentUser ? (
           <FarmTracker userAddress={currentUser.address} />
         ) : (
-          <ConnectScreen onConnect={handleConnect} onToggleTheme={toggleTheme} currentTheme={resolvedTheme} />
+          <ConnectScreen onConnect={handleConnect} />
         )}
       </main>
     </div>
@@ -255,10 +236,8 @@ export default function HomePage() {
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
   onConnect: () => void;
-  onToggleTheme: () => void;
-  currentTheme?: string;
 }
-const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect, onToggleTheme, currentTheme }) => (
+const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
   <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative">
     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
       Welcome to Farm Tracker
@@ -272,13 +251,7 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect, onToggleTheme,
     >
       Connect Wallet
     </button>
-    <button
-      onClick={onToggleTheme}
-      className="absolute top-4 right-4 p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600"
-      aria-label="Toggle Theme"
-    >
-      {currentTheme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-    </button>
+    {/* İSTEK 1 ÇÖZÜMÜ: Tema tuşu (sağ üst köşe) kaldırıldı */}
   </div>
 );
 
@@ -287,25 +260,19 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect, onToggleTheme,
 interface UserMenuProps {
   user: User;
   onDisconnect: () => void;
-  onToggleTheme: () => void;
-  currentTheme?: string;
 }
 const UserMenu: React.FC<UserMenuProps> = ({
   user,
   onDisconnect,
-  onToggleTheme,
-  currentTheme,
 }) => {
   return (
     <div className="relative inline-block text-left">
       <Menu>
         <Menu.Button className="flex items-center gap-2 p-1.5 pr-3 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-          <img
-            src={user.avatarUrl}
-            alt="Avatar"
-            className="w-8 h-8 rounded-full border-2 border-gray-200 dark:border-gray-600"
-          />
-          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
+          {/*
+            İSTEK 3 ÇÖZÜMÜ: '62' avatarı (<img>) kaldırıldı.
+          */}
+          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 px-2">
             {user.displayName}
           </span>
           <ChevronDown
@@ -323,27 +290,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
           leaveTo="transform opacity-0 scale-95"
         >
           <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-            <div className="py-1">
-              <Menu.Item>
-                {({ active }: { active: boolean }) => (
-                  <button
-                    onClick={onToggleTheme}
-                    className={`${
-                      active
-                        ? 'bg-gray-100 dark:bg-gray-700 text-gray-900 dark:text-white'
-                        : 'text-gray-700 dark:text-gray-300'
-                    } group flex w-full items-center rounded-md px-2 py-2 text-sm`}
-                  >
-                    {currentTheme === 'dark' ? (
-                      <Sun size={16} className="mr-2" />
-                    ) : (
-                      <Moon size={16} className="mr-2" />
-                    )}
-                    Toggle Theme
-                  </button>
-                )}
-              </Menu.Item>
-            </div>
+            {/* İSTEK 1 ÇÖZÜMÜ: Tema bölümü (py-1) kaldırıldı */}
             <div className="py-1">
               <Menu.Item>
                 {({ active }: { active: boolean }) => (
@@ -384,6 +331,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     try {
       const storageKey = getStorageKey('farm-tracker');
       const saved = localStorage.getItem(storageKey);
+      // VERCEL UYARISI DÜZELTMESİ (1/2): 'any' tip uyarısını kaldırmak için 'eslint-disable' yorumunu sildim
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const parsedProjects = (saved ? JSON.parse(saved) : []) as any[];
       return parsedProjects.map((p) => ({
@@ -826,8 +774,13 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                 {task.text}
               </label>
             </div>
-
-            <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
+            
+            {/*
+              İSTEK 2 ÇÖZÜMÜ:
+              'opacity-0 group-hover:opacity-100' kaldırıldı
+              ve etiketler hep görünür hale getirildi.
+            */}
+            <div className="flex items-center gap-2 ml-auto transition">
               <PriorityTag priority={task.priority} />
               {task.dueDate && (
                 <span
