@@ -16,7 +16,7 @@ import {
   ChevronDown,
 } from 'lucide-react';
 import { Menu, Transition } from '@headlessui/react';
-// --- ÇÖZÜM 2/A: WAGMI HOOK'LARINI (KANCALARINI) İMPORT EDİYORUZ ---
+// --- WAGMI HOOK'LARINI (KANCALARINI) İMPORT EDİYORUZ ---
 import { useConnect, useAccount, useDisconnect } from 'wagmi';
 
 // --- Tipler (Interfaces) ---
@@ -52,10 +52,10 @@ interface Project {
 export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   
-  // --- ÇÖZÜM 1/A: "Not Ready" KİLİDİ ---
+  // --- "Not Ready" KİLİDİ ---
   const [isAppReady, setIsAppReady] = useState(false);
 
-  // --- ÇÖZÜM 2/B: YENİ WAGMI CÜZDAN YÖNETİMİ ---
+  // --- YENİ WAGMI CÜZDAN YÖNETİMİ ---
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const { address, isConnected } = useAccount(); // Wagmi'den bağlantı durumunu al
   const { disconnect } = useDisconnect(); // Wagmi'den bağlantı kesme fonksiyonunu al
@@ -98,8 +98,7 @@ export default function HomePage() {
     };
   }, []);
 
-  // --- ÇÖZÜM 2/C: WAGMI'NİN DURUMUNA GÖRE KULLANICIYI GÜNCELLE ---
-  // (Eski localStorage'lı useEffect'leri sildik)
+  // --- WAGMI'NİN DURUMUNA GÖRE KULLANICIYI GÜNCELLE ---
   useEffect(() => {
     // "Not Ready" kilidi: Uygulama hazır olmadan cüzdanı kontrol etme
     if (isAppReady && isConnected && address) {
@@ -110,10 +109,10 @@ export default function HomePage() {
       setCurrentUser(null);
       localStorage.removeItem('basefarm_connected_address');
     }
-  }, [isConnected, address, isAppReady, buildUserProfile]);
+  }, [isConnected, address, isAppReady, buildUserProfile]); // "isAppReady" dependency'si burada
 
 
-  // --- ÇÖZÜM 1/B: "NOT READY" SİNYALİNİ YOLLA VE KİLİDİ AÇ ---
+  // --- "NOT READY" SİNYALİNİ YOLLA VE KİLİDİ AÇ ---
   useEffect(() => {
     setIsClient(true); 
 
@@ -150,8 +149,6 @@ export default function HomePage() {
       tries++;
       if (tryReady() || tries > 20) {
         clearInterval(id);
-        // 10 saniye sonra bile hazır değilse, kilidi zorla aç
-        // ki cüzdan kontrolü yapılabilsin.
         if (!isAppReady) setIsAppReady(true); 
       }
     }, 500);
@@ -168,14 +165,13 @@ export default function HomePage() {
     return null;
   }
 
-  // --- ÇÖZÜM 2/D: MODAL İÇİN CÜZDANLARI LİSTELE ---
-  // Bu, 'ConnectScreen' bileşenine gönderilecek
+  // --- MODAL İÇİN CÜZDANLARI LİSTELE ---
   const walletButtons = connectors
-    .filter((c) => c.ready) // Sadece tarayıcıda yüklü olanları göster
+    .filter((c) => c.ready) 
     .map((connector) => (
       <button
         key={connector.id}
-        onClick={() => connect({ connector })} // Wagmi'nin connect fonksiyonunu çağır
+        onClick={() => connect({ connector })} 
         className="mt-6 w-full px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
       >
         {connector.name}
@@ -192,11 +188,9 @@ export default function HomePage() {
         {currentUser ? (
           <UserMenu
             user={currentUser}
-            onDisconnect={() => disconnect()} // Wagmi'nin disconnect'ini kullan
+            onDisconnect={() => disconnect()} 
           />
         ) : (
-          // Wagmi'den gelen ilk cüzdanı (genellikle 'injected')
-          // "Connect Wallet" butonu olarak kullan
           connectors[0] && (
             <button
               onClick={() => connect({ connector: connectors[0] })}
@@ -213,7 +207,6 @@ export default function HomePage() {
         {currentUser ? (
           <FarmTracker userAddress={currentUser.address} />
         ) : (
-          // ConnectScreen'e butonları yolla
           <ConnectScreen walletButtons={walletButtons} />
         )}
       </main>
@@ -233,7 +226,6 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ walletButtons }) => (
     <p className="mt-2 text-gray-600 dark:text-gray-300">
       Please connect your wallet to manage tasks.
     </p>
-    {/* --- ÇÖZÜM 2/E: MODAL İÇİN BUTONLARI BURADA GÖSTER --- */}
     <div className="mt-4 space-y-2">
       {walletButtons.length > 0 ? (
         walletButtons
@@ -283,12 +275,11 @@ const UserMenu: React.FC<UserMenuProps> = ({
           leaveTo="transform opacity-0 scale-95"
         >
           <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-            {/* Tema bölümü (py-1) kaldırıldı */}
             <div className="py-1">
               <Menu.Item>
                 {({ active }: { active: boolean }) => (
                   <button
-                    onClick={onDisconnect} // Artık Wagmi'nin 'disconnect'ini çağırıyor
+                    onClick={onDisconnect} 
                     className={`${
                       active
                         ? 'bg-red-50 dark:bg-gray-700 text-red-600 dark:text-red-400'
