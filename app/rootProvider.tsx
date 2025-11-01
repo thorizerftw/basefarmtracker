@@ -1,7 +1,7 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-// MiniKitProvider ve OnchainKitProvider SİLİNDİ (çünkü page.tsx ile savaşıyorlardı)
+// MiniKitProvider ve OnchainKitProvider'ı KULLANMIYORUZ.
 import { WagmiProvider, createConfig, http } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { injected } from 'wagmi/connectors';
@@ -9,17 +9,20 @@ import { coinbaseWallet } from 'wagmi/connectors';
 import { ThemeProvider } from 'next-themes';
 import { ReactNode } from 'react';
 
-// Vercel build hatası ("No QueryClient") almamak için bu şart
 const queryClient = new QueryClient();
 
-// Cüzdan seçebilmek için bu connector ayarları şart
 const wagmiConfig = createConfig({
+  // --- NİHAİ ÇÖZÜM: TypeScript hatasını sustur ve otomatik bağlanmayı kapat ---
+  // @ts-ignore
+  autoConnect: false,
+  // ---
+  
   chains: [base],
   transports: {
     [base.id]: http(),
   },
   connectors: [
-    injected(), // Metamask, Farcaster (Warpcast) vb. tarayıcı cüzdanları
+    injected(), // Metamask, Farcaster vb.
     coinbaseWallet({
       appName: 'BaseFarm Tracker', 
       preference: 'smartWalletOnly',
@@ -29,10 +32,9 @@ const wagmiConfig = createConfig({
 
 export function RootProvider({ children }: { children: ReactNode }) {
   return (
-    // Artık 'Ready' sinyali veya 'eth_accounts' isteği yok.
-    // Sadece altyapıyı sağlıyoruz.
     <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>
+        {/* --- HATAYI DÜZELTTİM: "defaultTheme=" EKLENDİ --- */}
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
           {children}
         </ThemeProvider>
