@@ -14,10 +14,9 @@ import {
   Trash2,
   Edit2,
   ChevronDown,
-  // Sun, // VERCEL HATASI DÜZELTMESİ: 'Sun' kullanılmadığı için kaldırıldı
-  // Moon, // VERCEL HATASI DÜZELTMESİ: 'Moon' kullanılmadığı için kaldırıldı
+  // Sun ve Moon, Vercel hatasını (kullanılmıyor) çözmek için kaldırıldı
 } from 'lucide-react';
-// import { useTheme } from 'next-themes'; // VERCEL HATASI DÜZELTMESİ: 'useTheme' kullanılmadığı için kaldırıldı
+// useTheme, Vercel hatasını (kullanılmıyor) çözmek için kaldırıldı
 import { sendReadySignal } from './utils';
 import { Menu, Transition } from '@headlessui/react';
 
@@ -54,9 +53,6 @@ interface Project {
 export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-
-  // VERCEL HATASI DÜZELTMESİ: 'useTheme' import'u ve 'theme' değişkeni kaldırıldı (kullanılmıyordu)
-  // const { theme, setTheme, resolvedTheme } = useTheme();
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
 
@@ -342,8 +338,7 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
       const storageKey = getStorageKey('farm-tracker');
       const saved = localStorage.getItem(storageKey);
       // VERCEL UYARISI DÜZELTMESİ (1/2): 'any' tip uyarısını kaldırmak için 'eslint-disable' yorumunu sildim
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const parsedProjects = (saved ? JSON.parse(saved) : []) as any[];
+      const parsedProjects = (saved ? JSON.parse(saved) : []) as Project[];
       return parsedProjects.map((p) => ({
         ...p,
         details: p.details || { notes: '', website: '', twitter: '' },
@@ -398,15 +393,12 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    
-    // HATA BURADAYDI: '(e)' -> '(readerEvent)'
+    // VERCEL HATASI DÜZELTMESİ (2/2): '(e)' -> '(readerEvent)'
     reader.onload = (readerEvent) => { 
       try {
-        // HATA BURADAYDI: 'e.target' -> 'readerEvent.target'
+        // VERCEL HATASI DÜZELTMESİ (2/2): 'e.target' -> 'readerEvent.target'
         const text = readerEvent.target?.result as string; 
-        
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const importedProjects: any[] = JSON.parse(text);
+        const importedProjects: Project[] = JSON.parse(text);
 
         if (
           Array.isArray(importedProjects) &&
