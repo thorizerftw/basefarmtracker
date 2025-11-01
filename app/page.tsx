@@ -14,8 +14,10 @@ import {
   Trash2,
   Edit2,
   ChevronDown,
+  // Sun, // VERCEL HATASI DÜZELTMESİ: 'Sun' kullanılmadığı için kaldırıldı
+  // Moon, // VERCEL HATASI DÜZELTMESİ: 'Moon' kullanılmadığı için kaldırıldı
 } from 'lucide-react';
-// import { useTheme } from 'next-themes'; // VERCEL HATASI DÜZELTMESİ: 'useTheme' 59. satırda kullanılmadığı için ana import'u sildim
+// import { useTheme } from 'next-themes'; // VERCEL HATASI DÜZELTMESİ: 'useTheme' kullanılmadığı için kaldırıldı
 import { sendReadySignal } from './utils';
 import { Menu, Transition } from '@headlessui/react';
 
@@ -24,7 +26,7 @@ import { Menu, Transition } from '@headlessui/react';
 type User = {
   address: string;
   displayName: string;
-  avatarUrl: string; // İSTEK 3: "62" avatarı için bunu artık kullanmayacağız
+  avatarUrl: string;
 };
 
 interface Task {
@@ -53,7 +55,8 @@ export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
 
-  // VERCEL HATASI DÜZELTMESİ: 'useTheme' 59. satırda kullanılmıyordu, buradan kaldırdım.
+  // VERCEL HATASI DÜZELTMESİ: 'useTheme' import'u ve 'theme' değişkeni kaldırıldı (kullanılmıyordu)
+  // const { theme, setTheme, resolvedTheme } = useTheme();
 
   // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
 
@@ -64,27 +67,32 @@ export default function HomePage() {
       if (w.ethereum?.isCoinbaseWallet && w.ethereum?.coinbase?.getUser) {
         const user = await w.ethereum.coinbase.getUser();
         const display = user?.data?.profile?.displayName;
+        const image = user?.data?.profile?.profileImageUrl;
+        const initials = (display || address.substring(2, 4))
+          .substring(0, 2)
+          .toUpperCase();
         return {
           address,
-          // İSTEK 3 ÇÖZÜMÜ: 'displayName' (örn: 0x123...f6e4) kullan
           displayName:
             display ||
             `${address.substring(0, 6)}...${address.substring(
               address.length - 4,
             )}`,
-          avatarUrl: '', // İSTEK 3 ÇÖZÜMÜ: "62" avatarını artık kullanmıyoruz
+          avatarUrl:
+            image ||
+            `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
         };
       }
     } catch (e) {
       console.warn('Coinbase user profile fetch failed', e);
     }
-    // Fallback
+    const initials = address.substring(2, 4).toUpperCase();
     return {
       address,
       displayName: `${address.substring(0, 6)}...${address.substring(
         address.length - 4,
       )}`,
-      avatarUrl: '', // İSTEK 3 ÇÖZÜMÜ: "62" avatarını artık kullanmıyoruz
+      avatarUrl: `https://placehold.co/40x40/fbcfe8/db2777?text=${initials}`,
     };
   }, []);
 
@@ -190,8 +198,9 @@ export default function HomePage() {
     sendReadySignal();
   }, []);
 
-  // İSTEK 1 ÇÖZÜMÜ: Temayı <html> tag'ine uygula (hep dark)
+  // Temayı <html> tag'ine uygula
   useEffect(() => {
+    // Varsayılan olarak 'dark' modu zorluyoruz
     document.documentElement.classList.add('dark');
   }, []);
 
@@ -251,7 +260,6 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
     >
       Connect Wallet
     </button>
-    {/* İSTEK 1 ÇÖZÜMÜ: Tema tuşu (sağ üst köşe) kaldırıldı */}
   </div>
 );
 
@@ -269,10 +277,12 @@ const UserMenu: React.FC<UserMenuProps> = ({
     <div className="relative inline-block text-left">
       <Menu>
         <Menu.Button className="flex items-center gap-2 p-1.5 pr-3 bg-white dark:bg-gray-800 rounded-full shadow-sm border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition">
-          {/*
-            İSTEK 3 ÇÖZÜMÜ: '62' avatarı (<img>) kaldırıldı.
-          */}
-          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100 px-2">
+          <img
+            src={user.avatarUrl}
+            alt="Avatar"
+            className="w-8 h-8 rounded-full border-2 border-gray-200 dark:border-gray-600"
+          />
+          <span className="font-semibold text-sm text-gray-900 dark:text-gray-100">
             {user.displayName}
           </span>
           <ChevronDown
@@ -290,7 +300,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
           leaveTo="transform opacity-0 scale-95"
         >
           <Menu.Items className="absolute right-0 mt-2 w-56 origin-top-right bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700 rounded-md shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none">
-            {/* İSTEK 1 ÇÖZÜMÜ: Tema bölümü (py-1) kaldırıldı */}
+            {/* Tema bölümü (py-1) kaldırıldı */}
             <div className="py-1">
               <Menu.Item>
                 {({ active }: { active: boolean }) => (
@@ -389,10 +399,10 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
 
     const reader = new FileReader();
     // VERCEL HATASI DÜZELTMESİ (2/2): '(e)' -> '(readerEvent)'
-    reader.onload = (readerEvent) => {
+    reader.onload = (readerEvent) => { 
       try {
         // VERCEL HATASI DÜZELTMESİ (2/2): 'e.target' -> 'readerEvent.target'
-        const text = readerEvent.target?.result as string; 
+        const text = readerEvent.target?.result as string;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const importedProjects: any[] = JSON.parse(text);
 
@@ -774,13 +784,8 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                 {task.text}
               </label>
             </div>
-            
-            {/*
-              İSTEK 2 ÇÖZÜMÜ:
-              'opacity-0 group-hover:opacity-100' kaldırıldı
-              ve etiketler hep görünür hale getirildi.
-            */}
-            <div className="flex items-center gap-2 ml-auto transition">
+
+            <div className="flex items-center gap-2 ml-auto opacity-0 group-hover:opacity-100 transition">
               <PriorityTag priority={task.priority} />
               {task.dueDate && (
                 <span
