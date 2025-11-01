@@ -3,15 +3,8 @@ import { Inter } from 'next/font/google';
 import './globals.css';
 // RootProvider'ı import et
 import { RootProvider } from './rootProvider';
-// "NOT READY" SORUNUNU ÇÖZMEK İÇİN DOĞRU İSİM:
-import { MiniKitProvider } from '@coinbase/onchainkit/minikit'; // <-- BURAYI DÜZELTTİM
 
-const inter = Inter({ subsets: ['latin'] });
-
-// --- SENİN BİLGİLERİNİ BURAYA ELLE GİRDİM ---
-
-// Vercel URL'sini almak için config dosyasındaki kodun aynısı:
-// Resim linkleri buna ihtiyaç duyduğu için bunu eklemek zorundayız.
+// "IMAGE PREVIEW" İÇİN GEREKLİ METADATA KODU (Bu kalıyor):
 const ROOT_URL =
   process.env.NEXT_PUBLIC_URL ||
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
@@ -20,26 +13,26 @@ const ROOT_URL =
 
 export async function generateMetadata(): Promise<Metadata> {
   return {
-    // Bilgileri config'den okumak yerine direkt yazdım:
     title: "BaseFarm Tracker",
     description: "A personal and private airdrop farming checklist. Track your tasks, deadlines, and priorities for multiple projects, all locked to your crypto wallet.",
-    
     other: {
       "fc:miniapp": JSON.stringify({
         version: "1",
-        imageUrl: `${ROOT_URL}/basedroptracker-hero.png`, // Resim linkini oluşturdum
+        imageUrl: `${ROOT_URL}/basedroptracker-hero.png`,
         button: {
-          title: `Personal Airdrop Checklist`, // Proje adını direkt yazdım
+          title: `Launch BaseFarm Tracker`,
           action: {
-            name: `BaseFarm Tracker`, // Proje adını direkt yazdım
-            url: ROOT_URL // Ana sayfa linkini direkt verdim
+            name: `Launch BaseFarm Tracker`,
+            url: ROOT_URL
           },
         },
       }),
     },
   };
 }
-// --- ELLE GİRDİĞİM BÖLÜM BİTTİ ---
+// METADATA KODU BİTTİ
+
+const inter = Inter({ subsets: ['latin'] });
 
 export default function RootLayout({
   children,
@@ -51,11 +44,10 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className={inter.className}>
         {/*
-          Tüm siteyi 'RootProvider' ve "NOT READY" için 'MinikitProvider' ile sarmalıyoruz.
+          MinikitProvider'ı buradan kaldırdık. 
+          Tüm sağlayıcılar artık rootProvider'da.
         */}
-        <MiniKitProvider> {/* <-- BURAYI DA DÜZELTTİM */}
-          <RootProvider>{children}</RootProvider>
-        </MiniKitProvider>
+        <RootProvider>{children}</RootProvider>
       </body>
     </html>
   );
