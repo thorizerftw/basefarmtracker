@@ -14,12 +14,10 @@ import {
   Trash2,
   Edit2,
   ChevronDown,
-  // Sun ve Moon, Vercel hatasını (kullanılmıyor) çözmek için kaldırıldı
 } from 'lucide-react';
-// useTheme, Vercel hatasını (kullanılmıyor) çözmek için kaldırıldı
-// "sendReadySignal" import'unu sildik, çünkü arkadaşının yöntemini kullanacağız:
-// import { sendReadySignal } from './utils'; 
 import { Menu, Transition } from '@headlessui/react';
+// --- ÇÖZÜM 2/A: WAGMI HOOK'LARINI (KANCALARINI) İMPORT EDİYORUZ ---
+import { useConnect, useAccount, useDisconnect } from 'wagmi';
 
 // --- Tipler (Interfaces) ---
 
@@ -53,9 +51,16 @@ interface Project {
 // --- Ana Sayfa Bileşeni ---
 export default function HomePage() {
   const [isClient, setIsClient] = useState(false);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  
+  // --- ÇÖZÜM 1/A: "Not Ready" KİLİDİ ---
+  const [isAppReady, setIsAppReady] = useState(false);
 
-  // --- Cüzdan Bağlantı Mantığı (Arkadaşının kodundan alındı) ---
+  // --- ÇÖZÜM 2/B: YENİ WAGMI CÜZDAN YÖNETİMİ ---
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const { address, isConnected } = useAccount(); // Wagmi'den bağlantı durumunu al
+  const { disconnect } = useDisconnect(); // Wagmi'den bağlantı kesme fonksiyonunu al
+  const { connect, connectors } = useConnect(); // Wagmi'den cüzdan seçeneklerini al
+  // --- /YENİ WAGMI CÜZDAN YÖNETİMİ ---
 
   const buildUserProfile = useCallback(async (address: string): Promise<User> => {
     try {
@@ -93,129 +98,43 @@ export default function HomePage() {
     };
   }, []);
 
-  const handleDisconnect = useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ethereum = (window as any).ethereum;
-    try {
-      await ethereum?.request?.({
-        method: 'wallet_revokePermissions',
-        params: [{ eth_accounts: {} }],
-      });
-    } catch (e) {
-      console.warn('Revoke permissions failed', e);
-    }
-    localStorage.removeItem('basefarm_connected_address');
-    setCurrentUser(null);
-  }, []);
-
-  const handleConnect = useCallback(async () => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ethereum = (window as any).ethereum;
-    if (!ethereum) {
-      alert('Please install a wallet extension like MetaMask.');
-      return;
-    }
-    try {
-      const accounts: string[] = await ethereum.request({
-        method: 'eth_requestAccounts',
-      });
-      if (!accounts?.length) return;
-      
-      const addr = accounts[0];
-      const user = await buildUserProfile(addr);
-      localStorage.setItem('basefarm_connected_address', addr);
-      setCurrentUser(user);
-    } catch (e) {
-      console.warn('Wallet connection refused', e);
-    }
-  }, [buildUserProfile]);
-
+  // --- ÇÖZÜM 2/C: WAGMI'NİN DURUMUNA GÖRE KULLANICIYI GÜNCELLE ---
+  // (Eski localStorage'lı useEffect'leri sildik)
   useEffect(() => {
-    const savedAddress = localStorage.getItem('basefarm_connected_address');
-    if (!savedAddress) return;
+    // "Not Ready" kilidi: Uygulama hazır olmadan cüzdanı kontrol etme
+    if (isAppReady && isConnected && address) {
+      buildUserProfile(address).then(setCurrentUser);
+      // Wagmi cüzdanını localStorage'a kaydet (sayfa yenileme için)
+      localStorage.setItem('basefarm_connected_address', address);
+    } else if (!isConnected) {
+      setCurrentUser(null);
+      localStorage.removeItem('basefarm_connected_address');
+    }
+  }, [isConnected, address, isAppReady, buildUserProfile]);
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ethereum = (window as any).ethereum;
-    if (!ethereum) return;
 
-    ethereum
-      .request({ method: 'eth_accounts' })
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      .then(async (accounts: string[]) => {
-        if (
-          accounts?.length &&
-          accounts[0]?.toLowerCase() === savedAddress.toLowerCase()
-        ) {
-          const user = await buildUserProfile(accounts[0]);
-          setCurrentUser(user);
-        } else {
-          localStorage.removeItem('basefarm_connected_address');
-          setCurrentUser(null);
-        }
-      })
-      .catch(() => {
-        localStorage.removeItem('basefarm_connected_address');
-        setCurrentUser(null);
-      });
-  }, [buildUserProfile]);
-
+  // --- ÇÖZÜM 1/B: "NOT READY" SİNYALİNİ YOLLA VE KİLİDİ AÇ ---
   useEffect(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const ethereum = (window as any).ethereum;
-    if (!ethereum || !ethereum.on) return;
-
-    const onAccountsChanged = (accounts: string[]) => {
-      if (!accounts?.length) {
-        handleDisconnect();
-        return;
-      }
-      const newAddr = accounts[0];
-      if (
-        currentUser &&
-        newAddr.toLowerCase() !== currentUser.address.toLowerCase()
-      ) {
-        handleConnect();
-      }
-    };
-
-    ethereum.on('accountsChanged', onAccountsChanged);
-    return () => {
-      try {
-        ethereum.removeListener('accountsChanged', onAccountsChanged);
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      } catch (_e) {
-        // no-op
-      }
-    };
-  }, [currentUser, handleConnect, handleDisconnect]);
-
-  // --- /Cüzdan Bağlantı Mantığı ---
-
-  // --- "NOT READY" SORUNUNUN ÇÖZÜMÜ (Arkadaşının kodundan alındı) ---
-  // Senin "sendReadySignal()" satırını silip bunu ekledik.
-  useEffect(() => {
-    // Bu, hydration hatasını (isClient) önlemek için kalmalı
     setIsClient(true); 
 
-    // Arkadaşının "Ready" sinyal kodu
     const tryReady = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const m = (window as any)?.miniapp;
       if (!m) return false;
 
       try {
-        // Yeni SDK: sdk.actions.ready()
         if (m.actions?.ready) {
           m.actions.ready();
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (m.logger?.info || console.log)("ready_sent(actions.ready)");
+          setIsAppReady(true); // <-- KİLİDİ AÇ
           return true;
         }
-        // Eski/alternatif: sdk.ready()
         if (m.ready) {
           m.ready();
            // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (m.logger?.info || console.log)("ready_sent(ready)");
+          setIsAppReady(true); // <-- KİLİDİ AÇ
           return true;
         }
       } catch (e) {
@@ -226,26 +145,42 @@ export default function HomePage() {
 
     if (tryReady()) return;
 
-    // miniapp objesi geç gelebilir -> 10 sn boyunca dene
     let tries = 0;
     const id = setInterval(() => {
       tries++;
-      if (tryReady() || tries > 20) clearInterval(id);
+      if (tryReady() || tries > 20) {
+        clearInterval(id);
+        // 10 saniye sonra bile hazır değilse, kilidi zorla aç
+        // ki cüzdan kontrolü yapılabilsin.
+        if (!isAppReady) setIsAppReady(true); 
+      }
     }, 500);
 
     return () => clearInterval(id);
   }, []); // Boş dependency array'i [ ] kalmalı
-  // --- ÇÖZÜMÜN SONU ---
 
   // Temayı <html> tag'ine uygula
   useEffect(() => {
-    // Varsayılan olarak 'dark' modu zorluyoruz
     document.documentElement.classList.add('dark');
   }, []);
 
   if (!isClient) {
     return null;
   }
+
+  // --- ÇÖZÜM 2/D: MODAL İÇİN CÜZDANLARI LİSTELE ---
+  // Bu, 'ConnectScreen' bileşenine gönderilecek
+  const walletButtons = connectors
+    .filter((c) => c.ready) // Sadece tarayıcıda yüklü olanları göster
+    .map((connector) => (
+      <button
+        key={connector.id}
+        onClick={() => connect({ connector })} // Wagmi'nin connect fonksiyonunu çağır
+        className="mt-6 w-full px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+      >
+        {connector.name}
+      </button>
+    ));
 
   return (
     <div className="flex justify-center items-start min-h-screen bg-gray-100 dark:bg-gray-900 p-4 pt-24 sm:p-8 sm:pt-32">
@@ -257,15 +192,19 @@ export default function HomePage() {
         {currentUser ? (
           <UserMenu
             user={currentUser}
-            onDisconnect={handleDisconnect}
+            onDisconnect={() => disconnect()} // Wagmi'nin disconnect'ini kullan
           />
         ) : (
-          <button
-            onClick={handleConnect}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-          >
-            Connect Wallet
-          </button>
+          // Wagmi'den gelen ilk cüzdanı (genellikle 'injected')
+          // "Connect Wallet" butonu olarak kullan
+          connectors[0] && (
+            <button
+              onClick={() => connect({ connector: connectors[0] })}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+            >
+              Connect Wallet
+            </button>
+          )
         )}
       </header>
 
@@ -274,7 +213,8 @@ export default function HomePage() {
         {currentUser ? (
           <FarmTracker userAddress={currentUser.address} />
         ) : (
-          <ConnectScreen onConnect={handleConnect} />
+          // ConnectScreen'e butonları yolla
+          <ConnectScreen walletButtons={walletButtons} />
         )}
       </main>
     </div>
@@ -283,9 +223,9 @@ export default function HomePage() {
 
 // --- Bileşen: ConnectScreen (Cüzdan Bağlantı Ekranı) ---
 interface ConnectScreenProps {
-  onConnect: () => void;
+  walletButtons: React.ReactNode[]; // Butonları prop olarak al
 }
-const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
+const ConnectScreen: React.FC<ConnectScreenProps> = ({ walletButtons }) => (
   <div className="text-center p-8 bg-white dark:bg-gray-800 rounded-lg shadow-md relative">
     <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">
       Welcome to Farm Tracker
@@ -293,12 +233,16 @@ const ConnectScreen: React.FC<ConnectScreenProps> = ({ onConnect }) => (
     <p className="mt-2 text-gray-600 dark:text-gray-300">
       Please connect your wallet to manage tasks.
     </p>
-    <button
-      onClick={onConnect}
-      className="mt-6 px-5 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
-    >
-      Connect Wallet
-    </button>
+    {/* --- ÇÖZÜM 2/E: MODAL İÇİN BUTONLARI BURADA GÖSTER --- */}
+    <div className="mt-4 space-y-2">
+      {walletButtons.length > 0 ? (
+        walletButtons
+      ) : (
+        <p className="text-red-500">
+          No wallet connector found. Please install MetaMask or Coinbase Wallet.
+        </p>
+      )}
+    </div>
   </div>
 );
 
@@ -344,7 +288,7 @@ const UserMenu: React.FC<UserMenuProps> = ({
               <Menu.Item>
                 {({ active }: { active: boolean }) => (
                   <button
-                    onClick={onDisconnect}
+                    onClick={onDisconnect} // Artık Wagmi'nin 'disconnect'ini çağırıyor
                     className={`${
                       active
                         ? 'bg-red-50 dark:bg-gray-700 text-red-600 dark:text-red-400'
@@ -380,7 +324,6 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     try {
       const storageKey = getStorageKey('farm-tracker');
       const saved = localStorage.getItem(storageKey);
-      // VERCEL UYARISI DÜZELTMESİ (1/2): 'any' tip uyarısını kaldırmak için 'eslint-disable' yorumunu sildim
       const parsedProjects = (saved ? JSON.parse(saved) : []) as Project[];
       return parsedProjects.map((p) => ({
         ...p,
@@ -436,10 +379,8 @@ const FarmTracker: React.FC<FarmTrackerProps> = ({ userAddress }) => {
     if (!file) return;
 
     const reader = new FileReader();
-    // VERCEL HATASI DÜZELTMESİ (2/2): '(e)' -> '(readerEvent)'
     reader.onload = (readerEvent) => { 
       try {
-        // VERCEL HATASI DÜZELTMESİ (2/2): 'e.target' -> 'readerEvent.target'
         const text = readerEvent.target?.result as string; 
         const importedProjects: Project[] = JSON.parse(text);
 
@@ -961,6 +902,7 @@ const ProjectCard: React.FC<ProjectCardProps> = ({ project, setProjects }) => {
                   completedVisible ? 'rotate-0' : '-rotate-90'
                 }`}
               />
+              {/* --- ÇÖZÜM 1: 'İkon' YAZAN YERDEKİ SYNTAX HATASINI DÜZELTTİM --- */}
               {completedTasks.length} Completed Tasks
             </button>
             <div
