@@ -13,11 +13,15 @@ const ROOT_URL =
 export const minikitConfig: MiniAppManifest = {
   // Account Association (Burası "Ready" olduktan sonra doldurulacak)
   accountAssociation: {
-    header: "",
-    payload: "",
-    signature: "",
+    header: "eyJmaWQiOjQ1NzAxMSwidHlwZSI6ImN1c3RvZHkiLCJrZXkiOiIweDZBRTI4NTJBMDAxYmI5YjM4MTMzZThjNzg1MURmMzlGRDI5QzIxODYifQ",
+    payload: "eyJkb21haW4iOiJiYXNlZmFybXRyYWNrZXIudmVyY2VsLmFwcCJ9",
+    signature: "ofqEMGVsK6DnVGDDfGWWwic4v3JRmUY39c2aiTZSBVpLVWgyPHstle6BzBawy/a9+jgY+2dNVKZLQq5yI/5+nhs=",
   },
 
+  baseBuilder: {
+    ownerAddress: 
+      "0xf2868e11a1A1c8201c9b38f51827973a9362fA95"
+  },
   miniapp: {
     version: "1",
     name: "BaseFarm Tracker",
